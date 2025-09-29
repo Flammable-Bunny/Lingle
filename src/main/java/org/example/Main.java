@@ -19,7 +19,14 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import java.awt.Component;
 import javax.swing.JCheckBox;
-
+import java.nio.file.FileAlreadyExistsException;
+import javax.swing.*;
+import java.awt.*;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Main {
 
@@ -36,6 +43,7 @@ public class Main {
         try {
             ensureScriptsPresent();
             detectCurrentState();
+            createInitialDirectories();
         } catch (IOException e) {
             JOptionPane.showMessageDialog(
                     null,
@@ -47,6 +55,40 @@ public class Main {
         }
 
         SwingUtilities.invokeLater(Main::createAndShowUI);
+    }
+
+    private static void createInitialDirectories() throws IOException {
+        Path home = Path.of(System.getProperty("user.home"));
+        Path targetDir = home.resolve("Lingle");
+
+        if (!Files.exists(targetDir)) {
+            Files.createDirectories(targetDir);
+        }
+
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                    "sudo", "-n",
+                    "chown", System.getProperty("user.name") + ":" + System.getProperty("user.name"),
+                    targetDir.toString()
+            );
+            Process process = pb.start();
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                throw new IOException("Failed to set ownership on directory: " + targetDir);
+            }
+
+            pb = new ProcessBuilder(
+                    "sudo", "-n",
+                    "chmod", "700", targetDir.toString()
+            );
+            process = pb.start();
+            exitCode = process.waitFor();
+            if (exitCode != 0) {
+                throw new IOException("Failed to set permissions on directory: " + targetDir);
+            }
+        } catch (InterruptedException e) {
+            throw new IOException("Process interrupted while setting permissions", e);
+        }
     }
 
     private static void createAndShowUI() {
@@ -184,17 +226,18 @@ public class Main {
         runButton.setBounds(10, 35, 100, 35);
         buttonSection.add(runButton);
 
-        javax.swing.JPanel instancesSection = new javax.swing.JPanel(new BorderLayout());
-        instancesSection.setBackground(new Color(64, 64, 64));
+        javax.swing.JPanel instancesContainer = new JPanel();
+        instancesContainer.setLayout(new BoxLayout(instancesContainer, BoxLayout.Y_AXIS));
+        instancesContainer.setBackground(new Color(64, 64, 64)); // Dark Gray
 
-        javax.swing.JLabel instancesLabel = new javax.swing.JLabel("PrismLauncher Instances:");
+        JLabel instancesLabel = new JLabel("PrismLauncher Instances:");
         instancesLabel.setForeground(Color.WHITE);
         instancesLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
         instancesLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
 
-        javax.swing.JPanel checkboxPanel = new javax.swing.JPanel();
-        checkboxPanel.setLayout(new javax.swing.BoxLayout(checkboxPanel, javax.swing.BoxLayout.Y_AXIS));
-        checkboxPanel.setBackground(new Color(64, 64, 64));
+        JPanel checkboxPanel = new JPanel();
+        checkboxPanel.setLayout(new BoxLayout(checkboxPanel, BoxLayout.Y_AXIS));
+        checkboxPanel.setBackground(new Color(64, 64, 64)); // Dark Gray
 
         Path home = Path.of(System.getProperty("user.home"));
         Path prismInstancesDir = home.resolve(".local").resolve("share").resolve("PrismLauncher").resolve("instances");
@@ -206,35 +249,34 @@ public class Main {
                         .sorted()
                         .forEach(instanceDir -> {
                             String instanceName = instanceDir.getFileName().toString();
-                            javax.swing.JCheckBox checkbox = new javax.swing.JCheckBox(instanceName);
-                            checkbox.setBackground(new Color(64, 64, 64));
+                            JCheckBox checkbox = new JCheckBox(instanceName);
+                            checkbox.setBackground(new Color(64, 64, 64)); // Dark Gray
                             checkbox.setForeground(Color.WHITE);
                             checkbox.setFont(new Font("SansSerif", Font.PLAIN, 12));
                             checkbox.setBorder(BorderFactory.createEmptyBorder(2, 10, 2, 10));
                             checkboxPanel.add(checkbox);
                         });
             } else {
-                javax.swing.JLabel noInstancesLabel = new javax.swing.JLabel("No PrismLauncher instances found");
+                JLabel noInstancesLabel = new JLabel("No PrismLauncher instances found");
                 noInstancesLabel.setForeground(Color.LIGHT_GRAY);
                 noInstancesLabel.setFont(new Font("SansSerif", Font.ITALIC, 12));
                 noInstancesLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                 checkboxPanel.add(noInstancesLabel);
             }
         } catch (IOException e) {
-            javax.swing.JLabel errorLabel = new javax.swing.JLabel("Error reading instances directory");
+            JLabel errorLabel = new JLabel("Error reading instances directory");
             errorLabel.setForeground(Color.RED);
             errorLabel.setFont(new Font("SansSerif", Font.ITALIC, 12));
             errorLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
             checkboxPanel.add(errorLabel);
         }
 
-        javax.swing.JScrollPane scrollPane = new javax.swing.JScrollPane(checkboxPanel);
-        scrollPane.setBackground(new Color(64, 64, 64));
-        scrollPane.getViewport().setBackground(new Color(64, 64, 64));
+        JScrollPane scrollPane = new JScrollPane(checkboxPanel);
+        scrollPane.setBackground(new Color(64, 64, 64)); // Dark Gray
+        scrollPane.getViewport().setBackground(new Color(64, 64, 64)); // Dark Gray
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
 
-        instancesSection.add(instancesLabel, BorderLayout.NORTH);
-        instancesSection.add(scrollPane, BorderLayout.CENTER);
+        instancesContainer.add(scrollPane);
 
         JButton symlinkButton = new JButton("Symlink Instances");
         symlinkButton.setBackground(new Color(80, 80, 80));
@@ -267,63 +309,42 @@ public class Main {
             }
 
             if (!selectedCheckboxes.isEmpty()) {
-                int numInstances = selectedCheckboxes.size();
                 String userHome = System.getProperty("user.home");
 
                 try {
-                    for (int i = 0; i < numInstances; i++) {
+                    // Create directories for each selected instance
+                    for (int i = 0; i < selectedCheckboxes.size(); i++) {
+                        Path lingleDir = Path.of(userHome).resolve("Lingle").resolve(String.valueOf(i + 1));
+                        if (!Files.exists(lingleDir)) {
+                            Files.createDirectories(lingleDir);
+                        }
+                    }
+
+                    // Create symlinks for each selected instance
+                    for (int i = 0; i < selectedCheckboxes.size(); i++) {
                         JCheckBox checkbox = selectedCheckboxes.get(i);
                         String instanceName = checkbox.getText();
 
                         Path lingleDir = Path.of(userHome).resolve("Lingle").resolve(String.valueOf(i + 1));
-                        Files.createDirectories(lingleDir);
 
-                        ProcessBuilder pb = new ProcessBuilder(
-                                "sudo", "-n", "chown", userHome + ":" + lingleDir.toString()
-                        );
-                        pb.start().waitFor();
-                        pb = new ProcessBuilder("sudo", "-n", "chmod", "700", lingleDir.toString());
-                        pb.start().waitFor();
-
-                        Path instancePathMinecraft = Path.of(userHome)
+                        // Define the symlink source path
+                        Path savePathMinecraft = Path.of(userHome)
                                 .resolve(".local/share/PrismLauncher/instances")
                                 .resolve(instanceName).resolve("minecraft/saves");
-                        if (Files.exists(instancePathMinecraft)) {
-                            Files.walk(instancePathMinecraft)
-                                    .sorted((a, b) -> b.compareTo(a))
-                                    .forEach(path -> {
-                                        try {
-                                            Files.delete(path);
-                                        } catch (IOException ex) {
-                                        }
-                                    });
-                        }
 
-                        Path instancePathMinecraftDot = Path.of(userHome)
-                                .resolve(".local/share/PrismLauncher/instances")
-                                .resolve(instanceName).resolve(".minecraft/saves");
-                        if (Files.exists(instancePathMinecraftDot)) {
-                            Files.walk(instancePathMinecraftDot)
-                                    .sorted((a, b) -> b.compareTo(a))
-                                    .forEach(path -> {
-                                        try {
-                                            Files.delete(path);
-                                        } catch (IOException ex) {
-                                        }
-                                    });
-                        }
+                        try {
+                            Files.deleteIfExists(savePathMinecraft);  // Remove existing link if it exists
 
-                        Path symlinkTarget = instancePathMinecraft.toAbsolutePath();
-                        if (!Files.exists(symlinkTarget)) {
-                            symlinkTarget = instancePathMinecraftDot.toAbsolutePath();
+                            Files.createSymbolicLink(
+                                    savePathMinecraft,    // Source: instance's saves directory
+                                    lingleDir             // Target: Lingle's directory (without 'saves' folder)
+                            );
+                        } catch (FileAlreadyExistsException faee) {
+                            // If the symlink already exists, it should be handled above with deleteIfExists.
                         }
-
-                        Files.createSymbolicLink(
-                                lingleDir.resolve("saves"),
-                                symlinkTarget
-                        );
                     }
-                } catch (IOException | InterruptedException ex) {
+
+                } catch (IOException ex) {
                     JOptionPane.showMessageDialog(null, "Failed to create symbolic links: " + ex.getMessage(),
                             "Error", JOptionPane.ERROR_MESSAGE);
                 }
@@ -333,18 +354,26 @@ public class Main {
             }
         });
 
-        JPanel bottomSection = new JPanel();
-        bottomSection.setLayout(new BorderLayout());
-        bottomSection.add(instancesSection, BorderLayout.CENTER);
-        bottomSection.add(symlinkButton, BorderLayout.SOUTH);
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setBackground(new Color(64, 64, 64)); // Dark Gray
+        buttonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 0, 5)); // Align to left with no horizontal padding
+
+        symlinkButton.setPreferredSize(new Dimension(120, 35));
+        buttonPanel.add(symlinkButton);
+
+        instancesContainer.add(buttonPanel);
+        JPanel instancesSection = new JPanel(new BorderLayout());
+        instancesSection.setBackground(new Color(64, 64, 64)); // Dark Gray
+        instancesSection.add(instancesLabel, BorderLayout.NORTH);
+        instancesSection.add(instancesContainer, BorderLayout.CENTER);
 
         tmpfsPanel.add(buttonSection, BorderLayout.NORTH);
-        tmpfsPanel.add(bottomSection, BorderLayout.CENTER);
+        tmpfsPanel.add(instancesSection, BorderLayout.CENTER);
 
         javax.swing.JPanel settingsPanel = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER));
-        settingsPanel.setBackground(new Color(64, 64, 64));
+        settingsPanel.setBackground(new Color(64, 64, 64)); // Dark Gray
 
-        javax.swing.JLabel emptyLabel = new javax.swing.JLabel("nothing here yet");
+        JLabel emptyLabel = new JLabel("nothing here yet");
         emptyLabel.setForeground(Color.LIGHT_GRAY);
         emptyLabel.setFont(new Font("SansSerif", Font.ITALIC, 12));
         settingsPanel.add(emptyLabel);
@@ -367,7 +396,7 @@ public class Main {
         mainPanel.setBorder(BorderFactory.createLineBorder(new Color(100, 100, 100), 1));
 
         frame.getContentPane().add(mainPanel);
-        frame.setSize(500, 300);
+        frame.setSize(500, 600);
         frame.setLocationRelativeTo(null);
 
         frame.setVisible(true);
@@ -447,9 +476,6 @@ SIZE="4g"
 
 COMMENT="# LINGLE tmpfs"
 LINE="tmpfs ${TARGET} tmpfs defaults,size=${SIZE},mode=0700 0 0"
-
-mkdir -p "${TARGET}"
-chmod 0700 "${TARGET}"
 
 if ! grep -qF "${LINE}" /etc/fstab; then
   echo "${COMMENT}" >> /etc/fstab
