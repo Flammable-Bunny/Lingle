@@ -13,13 +13,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import java.awt.Component;
 import javax.swing.JCheckBox;
-import java.nio.file.FileAlreadyExistsException;
 import javax.swing.*;
 import java.awt.*;
 
@@ -29,7 +26,7 @@ public class Main {
     private static JButton runButton;
     private static long lastClickTime = 0;
 
-    public static void main(String[] args) {
+    static void main() {
         if (System.getenv("DISPLAY") == null && System.getenv("WAYLAND_DISPLAY") == null) {
             System.err.println("No DISPLAY/WAYLAND_DISPLAY found. This GUI requires a graphical session.");
             System.exit(1);
@@ -109,7 +106,7 @@ public class Main {
         closeButton.setForeground(Color.WHITE);
         closeButton.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
         closeButton.setFocusPainted(false);
-        closeButton.addActionListener(e -> System.exit(0));
+        closeButton.addActionListener(_ -> System.exit(0));
 
         titleBar.add(titleLabel, BorderLayout.WEST);
         titleBar.add(closeButton, BorderLayout.EAST);
@@ -153,11 +150,7 @@ public class Main {
 
         runButton = new JButton(buttonText());
         runButton.addActionListener(_ -> runToggleScriptAsync());
-        runButton.setBackground(new Color(80, 80, 80));
-        runButton.setForeground(Color.WHITE);
-        runButton.setBorder(BorderFactory.createLineBorder(new Color(150, 150, 150), 2));
-        runButton.setFocusPainted(false);
-        runButton.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        compressed(runButton);
         runButton.setPreferredSize(new Dimension(100, 35)); // consistent height
 
         JPanel tmpfsPanel = new JPanel(new BorderLayout());
@@ -185,20 +178,19 @@ public class Main {
         Path prismInstancesDir = home.resolve(".local").resolve("share").resolve("PrismLauncher").resolve("instances");
 
         try {
-            if (Files.exists(prismInstancesDir) && Files.isDirectory(prismInstancesDir)) {
-                Files.list(prismInstancesDir)
-                        .filter(Files::isDirectory)
-                        .sorted()
-                        .forEach(instanceDir -> {
-                            String instanceName = instanceDir.getFileName().toString();
-                            JCheckBox checkbox = new JCheckBox(instanceName);
-                            checkbox.setBackground(new Color(64, 64, 64));
-                            checkbox.setForeground(Color.WHITE);
-                            checkbox.setFont(new Font("SansSerif", Font.PLAIN, 12));
-                            checkbox.setBorder(BorderFactory.createEmptyBorder(2, 10, 2, 10));
-                            checkboxPanel.add(checkbox);
-                        });
-            } else {
+            if (Files.exists(prismInstancesDir) && Files.isDirectory(prismInstancesDir)) Files.list(prismInstancesDir)
+                    .filter(Files::isDirectory)
+                    .sorted()
+                    .forEach(instanceDir -> {
+                        String instanceName = instanceDir.getFileName().toString();
+                        JCheckBox checkbox = new JCheckBox(instanceName);
+                        checkbox.setBackground(new Color(64, 64, 64));
+                        checkbox.setForeground(Color.WHITE);
+                        checkbox.setFont(new Font("SansSerif", Font.PLAIN, 12));
+                        checkbox.setBorder(BorderFactory.createEmptyBorder(2, 10, 2, 10));
+                        checkboxPanel.add(checkbox);
+                    });
+            else {
                 JLabel noInstancesLabel = new JLabel("No PrismLauncher instances found");
                 noInstancesLabel.setForeground(Color.LIGHT_GRAY);
                 noInstancesLabel.setFont(new Font("SansSerif", Font.ITALIC, 12));
@@ -219,11 +211,7 @@ public class Main {
         scrollPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200)); // cap height for scrolling
 
         JButton symlinkButton = new JButton("Symlink Instances");
-        symlinkButton.setBackground(new Color(80, 80, 80));
-        symlinkButton.setForeground(Color.WHITE);
-        symlinkButton.setBorder(BorderFactory.createLineBorder(new Color(150, 150, 150), 2));
-        symlinkButton.setFocusPainted(false);
-        symlinkButton.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        compressed(symlinkButton);
         symlinkButton.setPreferredSize(new Dimension(150, 35)); // match Enable button height
 
         JPanel buttonRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
@@ -261,8 +249,8 @@ public class Main {
         contentPanel.add(tmpfsPanel, "auToMPFS");
         contentPanel.add(settingsPanel, " ");
 
-        tmpfsNavButton.addActionListener(e -> cardLayout.show(contentPanel, "auToMPFS"));
-        settingsNavButton.addActionListener(e -> cardLayout.show(contentPanel, " "));
+        tmpfsNavButton.addActionListener(_ -> cardLayout.show(contentPanel, "auToMPFS"));
+        settingsNavButton.addActionListener(_ -> cardLayout.show(contentPanel, " "));
 
         JPanel navAndContentPanel = new JPanel(new BorderLayout());
         navAndContentPanel.add(navPanel, BorderLayout.NORTH);
@@ -282,6 +270,14 @@ public class Main {
         frame.requestFocus();
     }
 
+    private static void compressed(JButton runButton) {
+        runButton.setBackground(new Color(80, 80, 80));
+        runButton.setForeground(Color.WHITE);
+        runButton.setBorder(BorderFactory.createLineBorder(new Color(150, 150, 150), 2));
+        runButton.setFocusPainted(false);
+        runButton.setFont(new Font("SansSerif", Font.PLAIN, 14));
+    }
+
     private static String buttonText() {
         return enabled ? "Disable" : "Enable";
     }
@@ -297,7 +293,7 @@ public class Main {
         final boolean runDisable = enabled;
 
         new Thread(() -> {
-            int exitCode = -1;
+            int exitCode;
             try {
                 ensureScriptsPresent();
                 Path home = Path.of(System.getProperty("user.home"));
