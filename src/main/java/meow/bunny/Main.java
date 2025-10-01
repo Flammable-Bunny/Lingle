@@ -638,12 +638,11 @@ public class Main {
                     "IFS=$'\\n'\n" +
                     "while true; do\n" +
                     "  if [ ! -d \"/proc/${APP_PID}\" ]; then exit 0; fi\n" +
-                    "  if ! grep -q '\"tmpfs\": \"enabled\"' \"$CFG\"; then exit 0; fi\n" +
                     "  if ! grep -q '\"adw\": true' \"$CFG\"; then exit 0; fi\n" +
                     "  for i in $(seq 1 ${X}); do\n" +
                     "    LDIR=\"${USER_HOME}/Lingle/${i}\"\n" +
                     "    [ -d \"$LDIR\" ] || continue\n" +
-                    "    for save in $(ls \"$LDIR\" -t1 --ignore='Z*' 2>/dev/null | tail -n +6); do\n" +
+                    "    for save in $(ls \"$LDIR\" -t1 --ignore='Z*' 2>/dev/null | tail -n +7); do\n" +
                     "      rm -rf \"${LDIR}/${save}\"\n" +
                     "    done\n" +
                     "  done\n" +
