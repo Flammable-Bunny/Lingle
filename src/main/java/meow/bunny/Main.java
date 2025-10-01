@@ -1,4 +1,4 @@
-package org.example;
+package meow.bunny;
 
 import javax.swing.*;
 import java.awt.*;
@@ -53,7 +53,6 @@ public class Main {
             ensureScriptsPresent();
             detectCurrentState();
             createInitialDirectories();
-            runPracticeMapLinkingIfNeeded();
             startAdwIfNeeded();
         } catch (IOException e) {
             showDarkMessage(null, "Lingle", "Initial Error: " + e.getMessage());
@@ -584,9 +583,6 @@ public class Main {
                     if (enabled) applySelected(runButton); else applyNormal(runButton);
                     saveCurrentState();
                     if (enabled && adwEnabled) startAdwIfNeeded(); else stopAdwQuietly();
-                    if (enabled && practiceMaps) {
-                        try { runPracticeMapLinkingIfNeeded(); } catch (IOException ignored) {}
-                    }
                 } else {
                     showDarkMessage(null, "Lingle", "Failed to execute task. Exit code: " + ec);
                 }
@@ -614,42 +610,6 @@ public class Main {
                 }
                 try { Files.createSymbolicLink(link, target); } catch (FileAlreadyExistsException ignored) {}
             }
-        }
-    }
-
-    private static void runPracticeMapLinkingIfNeeded() throws IOException {
-        if (!practiceMaps || !enabled) return;
-        if (instanceCount <= 0 || selectedPracticeMaps.isEmpty()) return;
-
-        Path home = Path.of(System.getProperty("user.home"));
-        Path scriptsDir = home.resolve(".local").resolve("share").resolve("lingle").resolve("scripts");
-        if (!Files.exists(scriptsDir)) Files.createDirectories(scriptsDir);
-
-        String userHome = home.toString();
-        StringBuilder sb = new StringBuilder();
-        sb.append("#!/bin/bash\nset -e\n\nfor k in {1..").append(instanceCount).append("}\ndo\n");
-        for (String map : selectedPracticeMaps) {
-            sb.append("  ln -s \"").append(userHome)
-                    .append("/.local/share/lingle/saves/").append(map)
-                    .append("\" \"").append(userHome).append("/Lingle/$k/\"\n");
-        }
-        sb.append("done\n");
-
-        Path linkScript = scriptsDir.resolve("link_practice_maps.sh");
-        Files.writeString(linkScript, sb.toString(), StandardCharsets.UTF_8);
-        linkScript.toFile().setExecutable(true, true);
-
-        for (int k = 1; k <= instanceCount; k++) {
-            Path d = home.resolve("Lingle").resolve(String.valueOf(k));
-            if (!Files.exists(d)) Files.createDirectories(d);
-        }
-
-        try {
-            ProcessBuilder pb = new ProcessBuilder("/bin/bash", linkScript.toString());
-            Process p = pb.start();
-            p.waitFor();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
         }
     }
 
