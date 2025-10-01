@@ -478,14 +478,14 @@ public class Main {
             int parsed = parsePositiveInt(adwIntervalField.getText(), adwIntervalSeconds);
             adwIntervalSeconds = Math.max(1, parsed);
             saveCurrentState();
-            if (adwEnabled && enabled) startAdwIfNeeded(); else stopAdwQuietly();
+            if (adwEnabled) startAdwIfNeeded(); else stopAdwQuietly();
         });
 
         adwApplyBtn.addActionListener(_ -> {
             int parsed = parsePositiveInt(adwIntervalField.getText(), adwIntervalSeconds);
             adwIntervalSeconds = Math.max(1, parsed);
             saveCurrentState();
-            if (adwEnabled && enabled) {
+            if (adwEnabled) {
                 stopAdwQuietly();
                 startAdwIfNeeded();
             }
@@ -582,7 +582,7 @@ public class Main {
                     runButton.setText(buttonText());
                     if (enabled) applySelected(runButton); else applyNormal(runButton);
                     saveCurrentState();
-                    if (enabled && adwEnabled) startAdwIfNeeded(); else stopAdwQuietly();
+                    if (adwEnabled) startAdwIfNeeded(); else stopAdwQuietly();
                 } else {
                     showDarkMessage(null, "Lingle", "Failed to execute task. Exit code: " + ec);
                 }
@@ -614,7 +614,7 @@ public class Main {
     }
 
     private static void startAdwIfNeeded() {
-        if (!adwEnabled || !enabled) return;
+        if (!adwEnabled) return;
         stopAdwQuietly();
 
         try {
