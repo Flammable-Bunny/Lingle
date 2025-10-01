@@ -5,12 +5,12 @@ plugins {
 }
 
 application {
-    mainClass.set("org.example.Main")
+    mainClass.set("meow.bunny.Main")
 }
 
 
-group = "org.example"
-version = "1.0-SNAPSHOT"
+group = "meow.bunny"
+version = "0.5-auToMPFSrelease"
 
 repositories {
     mavenCentral()
