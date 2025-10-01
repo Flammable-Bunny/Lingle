@@ -1,4 +1,4 @@
-package org.example;
+package meow.bunny;
 
 import javax.swing.*;
 import java.awt.*;
@@ -479,14 +479,14 @@ public class Main {
             int parsed = parsePositiveInt(adwIntervalField.getText(), adwIntervalSeconds);
             adwIntervalSeconds = Math.max(1, parsed);
             saveCurrentState();
-            if (adwEnabled && enabled) startAdwIfNeeded(); else stopAdwQuietly();
+            if (adwEnabled) startAdwIfNeeded(); else stopAdwQuietly();
         });
 
         adwApplyBtn.addActionListener(_ -> {
             int parsed = parsePositiveInt(adwIntervalField.getText(), adwIntervalSeconds);
             adwIntervalSeconds = Math.max(1, parsed);
             saveCurrentState();
-            if (adwEnabled && enabled) {
+            if (adwEnabled) {
                 stopAdwQuietly();
                 startAdwIfNeeded();
             }
@@ -583,7 +583,7 @@ public class Main {
                     runButton.setText(buttonText());
                     if (enabled) applySelected(runButton); else applyNormal(runButton);
                     saveCurrentState();
-                    if (enabled && adwEnabled) startAdwIfNeeded(); else stopAdwQuietly();
+                    if (adwEnabled) startAdwIfNeeded(); else stopAdwQuietly();
                     if (enabled && practiceMaps) {
                         try { runPracticeMapLinkingIfNeeded(); } catch (IOException ignored) {}
                     }
@@ -653,8 +653,9 @@ public class Main {
         }
     }
 
+
     private static void startAdwIfNeeded() {
-        if (!adwEnabled || !enabled) return;
+        if (!adwEnabled) return;
         stopAdwQuietly();
 
         try {
@@ -678,12 +679,11 @@ public class Main {
                     "IFS=$'\\n'\n" +
                     "while true; do\n" +
                     "  if [ ! -d \"/proc/${APP_PID}\" ]; then exit 0; fi\n" +
-                    "  if ! grep -q '\"tmpfs\": \"enabled\"' \"$CFG\"; then exit 0; fi\n" +
                     "  if ! grep -q '\"adw\": true' \"$CFG\"; then exit 0; fi\n" +
                     "  for i in $(seq 1 ${X}); do\n" +
                     "    LDIR=\"${USER_HOME}/Lingle/${i}\"\n" +
                     "    [ -d \"$LDIR\" ] || continue\n" +
-                    "    for save in $(ls \"$LDIR\" -t1 --ignore='Z*' 2>/dev/null | tail -n +6); do\n" +
+                    "    for save in $(ls \"$LDIR\" -t1 --ignore='Z*' 2>/dev/null | tail -n +7); do\n" +
                     "      rm -rf \"${LDIR}/${save}\"\n" +
                     "    done\n" +
                     "  done\n" +
@@ -720,11 +720,13 @@ set -euo pipefail
 
 USER_NAME="$(logname 2>/dev/null || id -un)"
 USER_HOME="$(getent passwd "${USER_NAME}" | cut -d: -f6)"
+USER_UID="$(id -u "${USER_NAME}")"
+USER_GID="$(id -g "${USER_NAME}")"
 TARGET="${USER_HOME}/Lingle"
 SIZE="4g"
 
 COMMENT="# LINGLE tmpfs"
-LINE="tmpfs ${TARGET} tmpfs defaults,size=${SIZE},mode=0700 0 0"
+LINE="tmpfs ${TARGET} tmpfs defaults,size=${SIZE},uid=${USER_UID},gid=${USER_GID},mode=0700 0 0"
 
 if ! grep -qF "${LINE}" /etc/fstab; then
   echo "${COMMENT}" >> /etc/fstab
@@ -732,7 +734,7 @@ if ! grep -qF "${LINE}" /etc/fstab; then
 fi
 
 if ! /usr/bin/mountpoint -q "${TARGET}"; then
-  mount "${TARGET}"
+  mount -t tmpfs -o size=4G,uid=$(id -u),gid=$(id -g),mode=700 tmpfs "${TARGET}"
 fi
 
 exit 0
@@ -749,7 +751,7 @@ USER_HOME="$(getent passwd "${USER_NAME}" | cut -d: -f6)"
 TARGET="${USER_HOME}/Lingle"
 
 COMMENT="# LINGLE tmpfs"
-LINE="tmpfs ${TARGET} tmpfs defaults,size=4g,mode=0700 0 0"
+LINE="tmpfs ${TARGET} tmpfs defaults,size=${SIZE},uid=${USER_UID},gid=${USER_GID},mode=0700 0 0"
 
 if /usr/bin/mountpoint -q "${TARGET}"; then
   umount "${TARGET}"
