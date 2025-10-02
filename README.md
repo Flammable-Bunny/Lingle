@@ -79,7 +79,7 @@ add the following line inside the block
 ```lua
 exec_lingle()
 ```
-**There are examples for what all of the blocks should look like after they are edited [here](https://github.com/Flammable-Bunny/Lingle/blob/master/exampleblocks.lua)**
+**There are examples for what all of the blocks should look like after they are edited [here](https://github.com/Flammable-Bunny/Lingle/blob/master/exampleblocks.md)**
 
 Please dm me on discord if there are any errors @`flammablebunny` ([Discord Link Here](https://discordapp.com/users/1202746280346918935))
 
