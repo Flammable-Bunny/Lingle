@@ -40,29 +40,44 @@ public class Main {
     private static final Font UI_FONT_BOLD = new Font("SansSerif", Font.BOLD, 14);
     private static final int ROW_H = 22;
 
-    static void main() {
-        System.setProperty("awt.useSystemAAFontSettings", "on");
-        System.setProperty("swing.aatext", "true");
-
-        if (System.getenv("DISPLAY") == null && System.getenv("NO WAYLAND_DISPLAY") == null) {
-            System.err.println("No DISPLAY/WAYLAND_DISPLAY found. This GUI requires a graphical session.");
-            System.exit(1);
-        }
+    public static void main(String[] args) {
+        boolean nogui = args.length > 0 && "--nogui".equals(args[0]);
 
         try {
             ensureScriptsPresent();
             detectCurrentState();
             createInitialDirectories();
-            runPracticeMapLinkingIfNeeded();
             startAdwIfNeeded();
         } catch (IOException e) {
-            showDarkMessage(null, "Lingle", "Initial Error: " + e.getMessage());
+            if (!nogui) {
+                showDarkMessage(null, "Lingle", "Initial Error: " + e.getMessage());
+            } else {
+                e.printStackTrace();
+            }
             System.exit(1);
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread(Main::stopAdwQuietly));
+
+        if (nogui) {
+            System.out.println("Running Lingle in nogui mode");
+            try {
+                Thread.currentThread().join();
+            } catch (InterruptedException ignored) {}
+            return;
+        }
+
+        // GUI path
+        if (System.getenv("DISPLAY") == null && System.getenv("WAYLAND_DISPLAY") == null) {
+            System.err.println("No DISPLAY/WAYLAND_DISPLAY found. This GUI requires a graphical session.");
+            System.exit(1);
+        }
+
+        System.setProperty("awt.useSystemAAFontSettings", "on");
+        System.setProperty("swing.aatext", "true");
         SwingUtilities.invokeLater(Main::createAndShowUI);
     }
+
 
     private static void createInitialDirectories() throws IOException {
         Path home = Path.of(System.getProperty("user.home"));
