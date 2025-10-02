@@ -40,7 +40,7 @@ public class Main {
     private static final Font UI_FONT_BOLD = new Font("SansSerif", Font.BOLD, 14);
     private static final int ROW_H = 22;
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         boolean nogui = args.length > 0 && "--nogui".equals(args[0]);
 
         try {
@@ -51,9 +51,7 @@ public class Main {
         } catch (IOException e) {
             if (!nogui) {
                 showDarkMessage(null, "Lingle", "Initial Error: " + e.getMessage());
-            } else {
-                e.printStackTrace();
-            }
+            } else e.printStackTrace();
             System.exit(1);
         }
 
@@ -172,7 +170,7 @@ public class Main {
         closeButton.setForeground(TXT);
         closeButton.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
         closeButton.setFocusPainted(false);
-        closeButton.addActionListener(_ -> System.exit(0));
+        closeButton.addActionListener(e -> System.exit(0));
         closeButton.addMouseListener(new MouseAdapter() {
             @Override public void mouseEntered(MouseEvent e) { closeButton.setBackground(Color.RED); }
             @Override public void mouseExited(MouseEvent e) { closeButton.setBackground(new Color(45, 45, 45)); }
@@ -227,7 +225,7 @@ public class Main {
             @Override public void mouseEntered(MouseEvent e) { applyHover(runButton); }
             @Override public void mouseExited(MouseEvent e) { if (enabled) applySelected(runButton); else applyNormal(runButton); }
         });
-        runButton.addActionListener(_ -> runToggleScriptAsync());
+        runButton.addActionListener(e -> runToggleScriptAsync());
 
         JPanel tmpfsPanel = new JPanel(new BorderLayout());
         tmpfsPanel.setBackground(BG);
@@ -311,7 +309,7 @@ public class Main {
         buttonRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         buttonRow.add(symlinkButton);
 
-        symlinkButton.addActionListener(_ -> {
+        symlinkButton.addActionListener(e -> {
             List<JCheckBox> selected = new ArrayList<>();
             for (Component c : instancesChecks.getComponents()) {
                 if (c instanceof JCheckBox cb && cb.isSelected()) selected.add(cb);
@@ -336,7 +334,7 @@ public class Main {
                         try {
                             Files.walk(savesPath)
                                     .sorted(Comparator.reverseOrder())
-                                    .forEach(p -> { try { Files.deleteIfExists(p); } catch (IOException _) {} });
+                                    .forEach(p -> { try { Files.deleteIfExists(p); } catch (IOException ignored) {} });
                         } catch (IOException ignored) {}
                     }
                     try {
@@ -416,7 +414,7 @@ public class Main {
         mapsButtonRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         mapsButtonRow.add(linkPracticeBtn);
 
-        linkPracticeBtn.addActionListener(_ -> {
+        linkPracticeBtn.addActionListener(e -> {
             try {
                 List<String> chosen = new ArrayList<>();
                 for (Component c : savesChecks.getComponents()) {
@@ -487,7 +485,7 @@ public class Main {
         adwRow.add(secondsLbl);
         adwRow.add(adwApplyBtn);
 
-        adwToggle.addActionListener(_ -> {
+        adwToggle.addActionListener(e -> {
             adwEnabled = adwToggle.isSelected();
             if (adwEnabled) { adwToggle.setBackground(BTN_SELECTED); adwToggle.setBorder(BorderFactory.createLineBorder(BTN_HOVER_BORDER, 2)); }
             else { adwToggle.setBackground(BTN_BG); adwToggle.setBorder(BorderFactory.createLineBorder(BTN_BORDER, 2)); }
@@ -497,7 +495,7 @@ public class Main {
             if (adwEnabled) startAdwIfNeeded(); else stopAdwQuietly();
         });
 
-        adwApplyBtn.addActionListener(_ -> {
+        adwApplyBtn.addActionListener(e -> {
             int parsed = parsePositiveInt(adwIntervalField.getText(), adwIntervalSeconds);
             adwIntervalSeconds = Math.max(1, parsed);
             saveCurrentState();
@@ -537,8 +535,8 @@ public class Main {
 
         contentPanel.add(tmpfsPanel, "auToMPFS");
         contentPanel.add(settingsPanel, " ");
-        tmpfsNavButton.addActionListener(_ -> cardLayout.show(contentPanel, "auToMPFS"));
-        settingsNavButton.addActionListener(_ -> cardLayout.show(contentPanel, " "));
+        tmpfsNavButton.addActionListener(e -> cardLayout.show(contentPanel, "auToMPFS"));
+        settingsNavButton.addActionListener(e -> cardLayout.show(contentPanel, " "));
 
         JPanel navAndContentPanel = new JPanel(new BorderLayout());
         navAndContentPanel.add(navPanel, BorderLayout.NORTH);
@@ -897,7 +895,7 @@ exit 0
         btns.setBackground(BG);
         JButton ok = new JButton("OK");
         styleWithHover(ok);
-        ok.addActionListener(_ -> d.dispose());
+        ok.addActionListener(e -> d.dispose());
         btns.add(ok);
         root.add(btns, BorderLayout.SOUTH);
 
@@ -947,8 +945,8 @@ exit 0
         JButton no = new JButton("Go Back");
         styleWithHover(yes);
         styleWithHover(no);
-        yes.addActionListener(_ -> { result[0] = 0; d.dispose(); });
-        no.addActionListener(_ -> { result[0] = 1; d.dispose(); });
+        yes.addActionListener(e -> { result[0] = 0; d.dispose(); });
+        no.addActionListener(e -> { result[0] = 1; d.dispose(); });
         btns.add(no);
         btns.add(yes);
         root.add(btns, BorderLayout.SOUTH);
