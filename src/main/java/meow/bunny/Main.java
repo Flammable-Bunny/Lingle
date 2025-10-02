@@ -40,7 +40,7 @@ public class Main {
     private static final Font UI_FONT_BOLD = new Font("SansSerif", Font.BOLD, 14);
     private static final int ROW_H = 22;
 
-    static void main(String[] args) {
+    public static void main(String[] args) {
         boolean nogui = args.length > 0 && "--nogui".equals(args[0]);
 
         try {
