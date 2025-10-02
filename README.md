@@ -21,7 +21,7 @@ The app works by creating and mounting `~/Lingle` with tmpfs, then telling your 
 Detects instances in `~/.local/share/PrismLauncher/instances` (default prismlauncher path), and allows you to automatically symlink them to numbered files within `~/Lingle/`
 
 ### Linking Practice Map Progression Across Instaces (Does not Require TMPFS)
-Detects world files in `~/.local/share/lingle`, and creates folders that point to the worlds real files in your instances saves files. This enables 
+Detects world files in `~/.local/share/lingle/saves`, and creates folders that point to the worlds real files in your instances saves files. This enables 
 
 
 # ADW (Auto Delete Worlds)
@@ -34,11 +34,53 @@ ADW is a tool that automatically deletes world folders from `~/Lingle`, preventi
 # SETUP
 
 ### auToMPFS:
-- Select every instance you want to enable tmpfs for, and press "Symlink Instances"
+- Move all your practice map world files to `~/.local/share/lingle/saves/` (restart app if you need, as the maps list only updates when you start the app)
+- Select every instance you want to enable tmpfs for, and press "Symlink Instances" Please note that **as of v0.5 there is no remove instance option**
 - Select all practice maps you want to link across instances, and click "Link Practice Maps"
 - Press "Auto Delete Worlds" to enable ADW, and instantly start it. 
+- Now you must edit your init.lua so that it starts Lingle, and AWD in the background. (im assuming your using Gore's Generic config file)
 
-Please note that **as of v0.5 there is no remove instance option**
+### Editing .lua for ADW
+for example if your add paths look something like:
+```lua
+    local pacem_path = "/home/<user>/Documents/paceman-tracker-0.7.1.jar"
+    local nb_path = "/home/<user>/Documents/Ninjabrain-Bot-1.5.1.jar"
+    local overlay_path = "/home/<user>/.config/waywall/measuring_overlay.png"
+```
+you need to add the following line below them
+```lua
+    local lingle_path = "/home/<user>/Documents/Lingle-0.5.4.jar" #(make sure version is correct)
+```
+Then scroll down to where the NBB and Paceman stuff is, and add the following lines:
+```lua
+--*********************************************************************************************** LINGLE
+local is_lingle_running = function()
+	local handle = io.popen("pgrep -f 'lingle..*'")
+	local result = handle:read("*l")
+	handle:close()
+	return result ~= nil
+end
+
+local exec_lingle = function()
+	if not is_lingle_running() then
+		waywall.exec("java -jar " .. lingle_path .. " --nogui")
+	end
+end
+```
+Then finnaly at the very bottom of your init.lua you should have this block:
+```lua
+	[open_ninbot_key] = function()
+		exec_ninb()
+		exec_pacem()
+	end,
+```
+add the following line inside the block
+```lua
+exec_lingle()
+```
+**There are examples for all of the blocks [here](https://github.com/Flammable-Bunny/Lingle/blob/master/exampleblocks.lua)**
+
+Please dm me on discord if there are any errors @`flammablebunny`
 
 #
 And finally, a big thanks to [Saanvi](https://github.com/its-saanvi) for creating the original guide for TMPFS, which inspired me to make auToMPFS.
