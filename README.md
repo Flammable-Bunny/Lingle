@@ -36,7 +36,7 @@ ADW is a tool that automatically deletes world folders from `~/Lingle`, preventi
 ### auToMPFS:
 - Select every instance you want to enable tmpfs for, and press "Symlink Instances"
 - Select all practice maps you want to link across instances, and click "Link Practice Maps"
-- Press "Auto Delete Worlds" to enable ADW, and automatically start it upon app launch.
+- Press "Auto Delete Worlds" to enable ADW, and instantly start it. 
 
 Please note that **as of v0.5 there is no remove instance option**
 
