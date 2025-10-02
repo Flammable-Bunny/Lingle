@@ -33,15 +33,16 @@ ADW is a tool that automatically deletes world folders from `~/Lingle`, preventi
 
 # SETUP
 
-### auToMPFS:
+### auToMPFS: (PLEASE DO THE FOLLOWING ACTIONS IN THE ORDER THEY ARE LISTED!)
 - Move all your practice map world files to `~/.local/share/lingle/saves/` (restart app if you need, as the maps list only updates when you start the app)
 - Select every instance you want to enable tmpfs for, and press "Symlink Instances" Please note that **as of v0.5 there is no remove instance option**
 - Select all practice maps you want to link across instances, and click "Link Practice Maps"
 - Press "Auto Delete Worlds" to enable ADW, and instantly start it. 
-- Now you must edit your init.lua so that it starts Lingle, and AWD in the background. (im assuming your using Gore's Generic config file)
+- Now you must edit your init.lua so that it starts Lingle, and AWD in the background.
 
 ### Editing .lua for ADW
-for example if your add paths look something like:
+You need to update your init.lua so that Lingle ADW can run in the background.
+for example if your add paths look something like: **(im assuming your using Gore's Generic config file or something similar)**
 ```lua
     local pacem_path = "/home/<user>/Documents/paceman-tracker-0.7.1.jar"
     local nb_path = "/home/<user>/Documents/Ninjabrain-Bot-1.5.1.jar"
@@ -80,7 +81,7 @@ exec_lingle()
 ```
 **There are examples for all of the blocks [here](https://github.com/Flammable-Bunny/Lingle/blob/master/exampleblocks.lua)**
 
-Please dm me on discord if there are any errors @`flammablebunny`
+Please dm me on discord if there are any errors @`flammablebunny` ([or click here](https://discordapp.com/users/1202746280346918935))
 
 #
 And finally, a big thanks to [Saanvi](https://github.com/its-saanvi) for creating the original guide for TMPFS, which inspired me to make auToMPFS.
