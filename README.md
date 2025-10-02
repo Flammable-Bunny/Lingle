@@ -6,7 +6,7 @@ Lingle is an all purpose linux tool for mcsr, designed to setup and be used alon
 # auToMPFS
 
 auToMPFS is a tool that automatically setus up TMPFS for you. 
-- TMPFS is a temporary filesystem that stores files in your RAM instead of your SSD. This offers extremely fast file writing, but causes your data to be deleted upon a system reboot or unmounting of the drive.
+- TMPFS is a temporary filesystem that stores files in your RAM instead of your SSD. This offers extremely fast file writing, but causes your data to be deleted upon a system reboot or unmounting of the drive. This usually gives about 5-10 more rps on seedqueue depending on how fast your ram is.
 
 The app works by creating and mounting `~/Lingle` with tmpfs, then telling your instances to write there instead of
 
