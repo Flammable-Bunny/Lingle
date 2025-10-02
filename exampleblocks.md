@@ -1,11 +1,15 @@
-#FIRST BLOCK EXAPLE (no context you got this)
+# FIRST BLOCK FULL EXAMPLE (no context you got this)
+
+```lua
 local pacem_path = "/home/<user>/Documents/paceman-tracker-0.7.1.jar"
 local nb_path = "/home/<user>/Documents/Ninjabrain-Bot-1.5.1.jar"
 local lingle_path = "/home/<user>/Documents/Lingle-0.5.4.jar"
 local overlay_path = "/home/<user>/.config/waywall/measuring_overlay.png"
+```
 
-#SECOND BLOCK (with context) ((your addding the middle one))
 
+# SECOND BLOCK (with context) ((your addding the middle one))
+```lua
 --*********************************************************************************************** PACEMAN
 local is_pacem_running = function()
 	local handle = io.popen("pgrep -f 'paceman..*'")
@@ -47,11 +51,12 @@ local exec_ninb = function()
 		waywall.exec("java -Dawt.useSystemAAFontSettings=on -jar " .. nb_path)
 	end
 end
-
-#THIRD BLOCK EXAMPLE
-
+```
+# THIRD BLOCK EXAMPLE
+```lua
 	[open_ninbot_key] = function()
 		exec_ninb()
 		exec_pacem()
 		exec_lingle()
 	end,
+```
