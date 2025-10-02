@@ -83,22 +83,23 @@ public class Main {
     private static void createInitialDirectories() throws IOException {
         Path home = Path.of(System.getProperty("user.home"));
         Path targetDir = home.resolve("Lingle");
-        if (!Files.exists(targetDir)) Files.createDirectories(targetDir);
+
+        if (!Files.exists(targetDir)) {
+            Files.createDirectories(targetDir);
+        }
+
         try {
-            ProcessBuilder pb = new ProcessBuilder("sudo", "-n", "chown",
-                    System.getProperty("user.name") + ":" + System.getProperty("user.name"),
-                    targetDir.toString());
-            Process process = pb.start();
-            int exitCode = process.waitFor();
-            if (exitCode != 0) throw new IOException("Failed to set ownership on " + targetDir);
-            pb = new ProcessBuilder("sudo", "-n", "chmod", "700", targetDir.toString());
-            process = pb.start();
-            exitCode = process.waitFor();
-            if (exitCode != 0) throw new IOException("Failed to set permissions on " + targetDir);
-        } catch (InterruptedException e) {
-            throw new IOException("Interrupted while setting permissions", e);
+            Files.setPosixFilePermissions(targetDir,
+                    java.util.Set.of(
+                            java.nio.file.attribute.PosixFilePermission.OWNER_READ,
+                            java.nio.file.attribute.PosixFilePermission.OWNER_WRITE,
+                            java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE
+                    )
+            );
+        } catch (UnsupportedOperationException e) {
         }
     }
+
 
     private static void applyNormal(JButton b) {
         b.setBackground(BTN_BG);

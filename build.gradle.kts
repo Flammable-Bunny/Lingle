@@ -10,7 +10,7 @@ application {
 
 
 group = "meow.bunny"
-version = "0.5-auToMPFSrelease"
+version = "0.5"
 
 repositories {
     mavenCentral()
