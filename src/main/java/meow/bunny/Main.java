@@ -49,11 +49,14 @@ public class Main {
             createInitialDirectories();
             startAdwIfNeeded();
         } catch (IOException e) {
-            if (!nogui) {
+            if (nogui) {
+                e.printStackTrace(System.err);
+            } else {
                 showDarkMessage(null, "Lingle", "Initial Error: " + e.getMessage());
-            } else e.printStackTrace();
+            }
             System.exit(1);
         }
+
 
         Runtime.getRuntime().addShutdownHook(new Thread(Main::stopAdwQuietly));
 
@@ -860,9 +863,11 @@ exit 0
     }
 
     private static void showDarkMessage(Component parent, String title, String message) {
-        JDialog d = new JDialog(SwingUtilities.getWindowAncestor(parent), title, Dialog.ModalityType.APPLICATION_MODAL);
+        Window owner = parent != null ? SwingUtilities.getWindowAncestor(parent) : null;
+        JDialog d = new JDialog(owner, title, Dialog.ModalityType.APPLICATION_MODAL);
         d.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         d.setResizable(false);
+
 
         JPanel root = new JPanel(new BorderLayout(14, 14));
         root.setBackground(BG);
