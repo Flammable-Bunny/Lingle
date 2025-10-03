@@ -81,7 +81,7 @@ exec_lingle()
 ```
 **There are examples for what all of the blocks should look like after they are edited [here](https://github.com/Flammable-Bunny/Lingle/blob/master/exampleblocks.md)**
 
-Please dm me on discord if there are any errors @`flammablebunny` ([Discord Link Here](https://discordapp.com/users/1202746280346918935))
+Please ask for help in the lingle discord server if you need any help [Discord Link](https://discord.gg/9pQDfQbfXp)
 
 #
 And finally, a big thanks to [Saanvi](https://github.com/its-saanvi) for creating the original guide for TMPFS, which inspired me to make auToMPFS.
