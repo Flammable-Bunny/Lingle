@@ -23,6 +23,9 @@ Detects instances in `~/.local/share/PrismLauncher/instances` (default prismlaun
 ### Linking Practice Map Progression Across Instaces (Does not Require TMPFS)
 Detects world files in `~/.local/share/lingle/saves`, and creates folders that point to the worlds real files in your instances saves files. This enables 
 
+### Create Directories on Startup
+Makes a Systemd service, and puts it in `~/.config/systemd/user/tmpfs.service`
+
 
 # ADW (Auto Delete Worlds)
 ADW is a tool that automatically deletes world folders from `~/Lingle`, preventing your ram from filling up and crashing your instance.
@@ -37,6 +40,7 @@ ADW is a tool that automatically deletes world folders from `~/Lingle`, preventi
 - Move all your practice map world files to `~/.local/share/lingle/saves/` (restart app if you need, as the maps list only updates when you start the app)
 - Select every instance you want to enable tmpfs for, and press "Symlink Instances" Please note that **as of v0.5 there is no remove instance option**
 - Select all practice maps you want to link across instances, and click "Link Practice Maps"
+- Press "Create Directories on Startup" so that next time you restart your compter it Links the practice maps at startup.
 - Press "Auto Delete Worlds" to enable ADW, and instantly start it. 
 - Now you must edit your init.lua so that it starts Lingle, and AWD in the background.
 
