@@ -10,7 +10,7 @@ application {
 
 
 group = "meow.bunny"
-version = "0.5"
+version = "0.5.5"
 
 repositories {
     mavenCentral()
@@ -35,3 +35,8 @@ tasks.withType<JavaCompile> {
     options.release.set(17)
 }
 
+tasks.shadowJar {
+    archiveBaseName.set("Lingle")
+    archiveVersion.set(version.toString())
+    archiveClassifier.set("")
+}

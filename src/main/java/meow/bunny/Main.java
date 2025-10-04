@@ -4,11 +4,16 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -16,6 +21,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Main {
+
+    private static final String CURRENT_VERSION = "0.5.5";
 
     private static volatile boolean enabled = false;
     private static boolean practiceMaps = false;
@@ -46,7 +53,7 @@ public class Main {
         try {
             ensureScriptsPresent();
             detectCurrentState();
-            createInitialDirectories();
+            checkForUpdates();
             startAdwIfNeeded();
         } catch (IOException e) {
             if (nogui) {
@@ -56,7 +63,6 @@ public class Main {
             }
             System.exit(1);
         }
-
 
         Runtime.getRuntime().addShutdownHook(new Thread(Main::stopAdwQuietly));
 
@@ -68,7 +74,6 @@ public class Main {
             return;
         }
 
-        // GUI path
         if (System.getenv("DISPLAY") == null && System.getenv("WAYLAND_DISPLAY") == null) {
             System.err.println("No DISPLAY/WAYLAND_DISPLAY found. This GUI requires a graphical session.");
             System.exit(1);
@@ -80,26 +85,80 @@ public class Main {
     }
 
 
-    private static void createInitialDirectories() throws IOException {
-        Path home = Path.of(System.getProperty("user.home"));
-        Path targetDir = home.resolve("Lingle");
-
-        if (!Files.exists(targetDir)) {
-            Files.createDirectories(targetDir);
+    private static int compareVersions(String v1, String v2) {
+        String[] a1 = v1.replaceFirst("^v","").split("\\.");
+        String[] a2 = v2.replaceFirst("^v","").split("\\.");
+        int len = Math.max(a1.length, a2.length);
+        for (int i = 0; i < len; i++) {
+            int n1 = i < a1.length ? Integer.parseInt(a1[i]) : 0;
+            int n2 = i < a2.length ? Integer.parseInt(a2[i]) : 0;
+            if (n1 != n2) return Integer.compare(n1, n2);
         }
+        return 0;
+    }
 
+    private static void checkForUpdates() {
         try {
-            Files.setPosixFilePermissions(targetDir,
-                    java.util.Set.of(
-                            java.nio.file.attribute.PosixFilePermission.OWNER_READ,
-                            java.nio.file.attribute.PosixFilePermission.OWNER_WRITE,
-                            java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE
-                    )
+            URL url = new URL("https://api.github.com/repos/Flammable-Bunny/Lingle/releases/latest");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+
+            String json;
+            try (InputStream in = conn.getInputStream()) {
+                json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
+
+            Matcher m = Pattern.compile("\"tag_name\"\\s*:\\s*\"(.*?)\"").matcher(json);
+            if (!m.find()) return;
+            String latest = m.group(1).trim();
+            String current = CURRENT_VERSION;
+
+            if (compareVersions(latest, current) <= 0) return;
+
+            Matcher dl = Pattern.compile("\"browser_download_url\"\\s*:\\s*\"(.*?\\.jar)\"").matcher(json);
+            if (!dl.find()) return;
+            String downloadUrl = dl.group(1);
+
+            int choice = JOptionPane.showConfirmDialog(
+                    null,
+                    "A new version (" + latest + ") is available.\nUpdate now?",
+                    "Lingle Update",
+                    JOptionPane.YES_NO_OPTION
             );
-        } catch (UnsupportedOperationException e) {
+
+            if (choice == JOptionPane.YES_OPTION) {
+                downloadAndReplaceJar(downloadUrl);
+            }
+        } catch (Exception ignored) {
         }
     }
 
+    private static void downloadAndReplaceJar(String downloadUrl) throws IOException {
+        Path tmp = Files.createTempFile("lingle-update", ".jar");
+        try (InputStream in = new URL(downloadUrl).openStream()) {
+            Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        String jarPath = new File(Main.class.getProtectionDomain()
+                .getCodeSource().getLocation().getPath()).getAbsolutePath();
+
+        Path updater = Files.createTempFile("lingle-updater", ".sh");
+        Files.writeString(updater, """
+        #!/bin/bash
+        oldjar="$1"
+        newjar="$2"
+        sleep 2
+        rm -f "$oldjar"
+        mv "$newjar" "$oldjar"
+        exec java -jar "$oldjar" &
+        """, StandardCharsets.UTF_8);
+        updater.toFile().setExecutable(true);
+
+        new ProcessBuilder(updater.toString(), jarPath, tmp.toString()).start();
+        System.exit(0);
+    }
 
     private static void applyNormal(JButton b) {
         b.setBackground(BTN_BG);
@@ -164,7 +223,7 @@ public class Main {
         titleBar.setBackground(new Color(45, 45, 45));
         titleBar.setPreferredSize(new Dimension(0, 25));
 
-        JLabel titleLabel = new JLabel("Lingle");
+        JLabel titleLabel = new JLabel("Lingle v0.5.5");
         titleLabel.setForeground(TXT);
         titleLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
         titleLabel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 5));
@@ -322,8 +381,7 @@ public class Main {
                 showDarkMessage(frame, "No Instances Selected", "Please select at least one instance.");
                 return;
             }
-            int choice = showConfirmDark(frame
-            );
+            int choice = InstancelinkWarn(frame);
             if (choice != 0) return;
 
             try {
@@ -452,6 +510,22 @@ public class Main {
             }
         });
 
+        JButton createDirsBtn = new JButton("Create Directories on Startup");
+        createDirsBtn.setFocusPainted(false);
+        createDirsBtn.setFont(UI_FONT);
+        createDirsBtn.setPreferredSize(new Dimension(240, 35));
+        styleWithHover(createDirsBtn);
+        createDirsBtn.addActionListener(e -> {
+            int choice = DirectoriesWarn(frame);
+            if (choice != 0) return;
+            installCreateDirsService(frame);
+        });
+
+        JPanel dirsRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+        dirsRow.setBackground(BG);
+        dirsRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        dirsRow.add(createDirsBtn);
+
         JLabel adwLabel = new JLabel("Auto Delete Worlds:");
         adwLabel.setForeground(TXT);
         adwLabel.setFont(UI_FONT_BOLD);
@@ -489,26 +563,6 @@ public class Main {
         adwRow.add(secondsLbl);
         adwRow.add(adwApplyBtn);
 
-        adwToggle.addActionListener(e -> {
-            adwEnabled = adwToggle.isSelected();
-            if (adwEnabled) { adwToggle.setBackground(BTN_SELECTED); adwToggle.setBorder(BorderFactory.createLineBorder(BTN_HOVER_BORDER, 2)); }
-            else { adwToggle.setBackground(BTN_BG); adwToggle.setBorder(BorderFactory.createLineBorder(BTN_BORDER, 2)); }
-            int parsed = parsePositiveInt(adwIntervalField.getText(), adwIntervalSeconds);
-            adwIntervalSeconds = Math.max(1, parsed);
-            saveCurrentState();
-            if (adwEnabled) startAdwIfNeeded(); else stopAdwQuietly();
-        });
-
-        adwApplyBtn.addActionListener(e -> {
-            int parsed = parsePositiveInt(adwIntervalField.getText(), adwIntervalSeconds);
-            adwIntervalSeconds = Math.max(1, parsed);
-            saveCurrentState();
-            if (adwEnabled) {
-                stopAdwQuietly();
-                startAdwIfNeeded();
-            }
-        });
-
         JPanel mainListContainer = new JPanel();
         mainListContainer.setLayout(new BoxLayout(mainListContainer, BoxLayout.Y_AXIS));
         mainListContainer.setBackground(BG);
@@ -518,6 +572,7 @@ public class Main {
         mainListContainer.add(savesLabel);
         mainListContainer.add(savesScroll);
         mainListContainer.add(mapsButtonRow);
+        mainListContainer.add(dirsRow);
         mainListContainer.add(adwLabel);
         mainListContainer.add(adwRow);
 
@@ -553,7 +608,7 @@ public class Main {
 
         frame.setUndecorated(true);
         frame.setContentPane(mainPanel);
-        frame.setSize(525, 750);
+        frame.setSize(525, 775);
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
         frame.toFront();
@@ -669,7 +724,6 @@ public class Main {
             Thread.currentThread().interrupt();
         }
     }
-
 
     private static void startAdwIfNeeded() {
         if (!adwEnabled) return;
@@ -869,7 +923,6 @@ exit 0
         d.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         d.setResizable(false);
 
-
         JPanel root = new JPanel(new BorderLayout(14, 14));
         root.setBackground(BG);
         root.setBorder(BorderFactory.createCompoundBorder(
@@ -912,7 +965,7 @@ exit 0
         d.setVisible(true);
     }
 
-    private static int showConfirmDark(Component parent) {
+    private static int InstancelinkWarn (Component parent) {
         final int[] result = {-1};
         JDialog d = new JDialog(SwingUtilities.getWindowAncestor(parent), "Symlinking Confirmation", Dialog.ModalityType.APPLICATION_MODAL);
         d.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
@@ -963,5 +1016,94 @@ exit 0
         d.setLocationRelativeTo(parent);
         d.setVisible(true);
         return result[0];
+    }
+
+    private static int DirectoriesWarn (Component parent) {
+        final int[] result = {-1};
+        JDialog d = new JDialog(SwingUtilities.getWindowAncestor(parent), "Create Directories Confirmation", Dialog.ModalityType.APPLICATION_MODAL);
+        d.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        d.setResizable(false);
+
+        JPanel root = new JPanel(new BorderLayout(14,14));
+        root.setBackground(BG);
+        root.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(100,100,100), 1),
+                BorderFactory.createEmptyBorder(18,18,18,18)
+        ));
+
+        JLabel header = new JLabel("Confirmation");
+        header.setForeground(TXT);
+        header.setFont(new Font("SansSerif", Font.BOLD, 18));
+        header.setBorder(BorderFactory.createEmptyBorder(0,0,6,0));
+        root.add(header, BorderLayout.NORTH);
+
+        int wrapWidth = 460;
+        JTextArea ta = new JTextArea("This feature ONLY works on systemd-based distributions (Arch, Fedora, Debian, etc.) It will NOT work on non-systemd distros (Artix, Gentoo, FreeBSD, etc.).");
+        ta.setEditable(false);
+        ta.setWrapStyleWord(true);
+        ta.setLineWrap(true);
+        ta.setOpaque(false);
+        ta.setForeground(TXT);
+        ta.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        ta.setBorder(BorderFactory.createEmptyBorder(6,8,6,8));
+        ta.setSize(new Dimension(wrapWidth, Short.MAX_VALUE));
+        Dimension pref = ta.getPreferredSize();
+        ta.setPreferredSize(new Dimension(wrapWidth, pref.height));
+        root.add(ta, BorderLayout.CENTER);
+
+        JPanel btns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        btns.setBackground(BG);
+        JButton yes = new JButton("Continue");
+        JButton no = new JButton("Go Back");
+        styleWithHover(yes);
+        styleWithHover(no);
+        yes.addActionListener(e -> { result[0] = 0; d.dispose(); });
+        no.addActionListener(e -> { result[0] = 1; d.dispose(); });
+        btns.add(no);
+        btns.add(yes);
+        root.add(btns, BorderLayout.SOUTH);
+
+        d.setContentPane(root);
+        d.pack();
+        d.setMinimumSize(new Dimension(520, 200));
+        d.setLocationRelativeTo(parent);
+        d.setVisible(true);
+        return result[0];
+    }
+
+    private static void installCreateDirsService(JFrame parent) {
+        try {
+            String service = """
+            [Unit]
+            Description=Create Lingle instance directories on startup
+            After=local-fs.target
+
+            [Service]
+            Type=oneshot
+            ExecStart=%h/.local/share/lingle/scripts/folders.tmpfs
+            RemainAfterExit=yes
+
+            [Install]
+            WantedBy=multi-user.target
+            """;
+
+            Path tmp = Files.createTempFile("lingle-tmpfs-service", ".service");
+            Files.writeString(tmp, service, StandardCharsets.UTF_8);
+
+            ProcessBuilder pb = new ProcessBuilder(
+                    "sudo", "bash", "-c",
+                    "mv " + tmp.toAbsolutePath() + " /etc/systemd/system/tmpfs.service && systemctl enable tmpfs.service"
+            );
+            pb.inheritIO();
+            int exit = pb.start().waitFor();
+
+            if (exit == 0) {
+                showDarkMessage(parent, "Success", "Systemd service installed and enabled.");
+            } else {
+                showDarkMessage(parent, "Error", "Failed to install service. Exit code: 3" + exit);
+            }
+        } catch (Exception e) {
+            showDarkMessage(parent, "Error", "Exception: " + e.getMessage());
+        }
     }
 }
