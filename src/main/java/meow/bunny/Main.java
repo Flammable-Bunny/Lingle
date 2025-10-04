@@ -53,6 +53,7 @@ public class Main {
         try {
             ensureScriptsPresent();
             detectCurrentState();
+            PracticeMapLinking();
             checkForUpdates();
             startAdwIfNeeded();
         } catch (IOException e) {
@@ -70,7 +71,8 @@ public class Main {
             System.out.println("Running Lingle in nogui mode");
             try {
                 Thread.currentThread().join();
-            } catch (InterruptedException ignored) {}
+            } catch (InterruptedException ignored) {
+            }
             return;
         }
 
@@ -85,9 +87,9 @@ public class Main {
     }
 
 
-    private static int compareVersions(String v1, String v2) {
-        String[] a1 = v1.replaceFirst("^v","").split("\\.");
-        String[] a2 = v2.replaceFirst("^v","").split("\\.");
+    private static int compareVersions(String v1) {
+        String[] a1 = v1.replaceFirst("^v", "").split("\\.");
+        String[] a2 = Main.CURRENT_VERSION.replaceFirst("^v", "").split("\\.");
         int len = Math.max(a1.length, a2.length);
         for (int i = 0; i < len; i++) {
             int n1 = i < a1.length ? Integer.parseInt(a1[i]) : 0;
@@ -113,9 +115,8 @@ public class Main {
             Matcher m = Pattern.compile("\"tag_name\"\\s*:\\s*\"(.*?)\"").matcher(json);
             if (!m.find()) return;
             String latest = m.group(1).trim();
-            String current = CURRENT_VERSION;
 
-            if (compareVersions(latest, current) <= 0) return;
+            if (compareVersions(latest) <= 0) return;
 
             Matcher dl = Pattern.compile("\"browser_download_url\"\\s*:\\s*\"(.*?\\.jar)\"").matcher(json);
             if (!dl.find()) return;
@@ -146,14 +147,14 @@ public class Main {
 
         Path updater = Files.createTempFile("lingle-updater", ".sh");
         Files.writeString(updater, """
-        #!/bin/bash
-        oldjar="$1"
-        newjar="$2"
-        sleep 2
-        rm -f "$oldjar"
-        mv "$newjar" "$oldjar"
-        exec java -jar "$oldjar" &
-        """, StandardCharsets.UTF_8);
+                #!/bin/bash
+                oldjar="$1"
+                newjar="$2"
+                sleep 2
+                rm -f "$oldjar"
+                mv "$newjar" "$oldjar"
+                exec java -jar "$oldjar" &
+                """, StandardCharsets.UTF_8);
         updater.toFile().setExecutable(true);
 
         new ProcessBuilder(updater.toString(), jarPath, tmp.toString()).start();
@@ -182,8 +183,15 @@ public class Main {
     private static void styleWithHover(JButton b) {
         applyNormal(b);
         b.addMouseListener(new MouseAdapter() {
-            @Override public void mouseEntered(MouseEvent e) { applyHover(b); }
-            @Override public void mouseExited(MouseEvent e) { applyNormal(b); }
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                applyHover(b);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                applyNormal(b);
+            }
         });
     }
 
@@ -198,8 +206,14 @@ public class Main {
         }
         b.setForeground(TXT);
         b.addMouseListener(new MouseAdapter() {
-            @Override public void mouseEntered(MouseEvent e) { b.setBackground(BTN_HOVER); b.setBorder(BorderFactory.createLineBorder(BTN_HOVER_BORDER, 2)); }
-            @Override public void mouseExited(MouseEvent e) {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                b.setBackground(BTN_HOVER);
+                b.setBorder(BorderFactory.createLineBorder(BTN_HOVER_BORDER, 2));
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
                 if (isSelected.getAsBoolean()) {
                     b.setBackground(BTN_SELECTED);
                     b.setBorder(BorderFactory.createLineBorder(BTN_HOVER_BORDER, 2));
@@ -235,8 +249,15 @@ public class Main {
         closeButton.setFocusPainted(false);
         closeButton.addActionListener(e -> System.exit(0));
         closeButton.addMouseListener(new MouseAdapter() {
-            @Override public void mouseEntered(MouseEvent e) { closeButton.setBackground(Color.RED); }
-            @Override public void mouseExited(MouseEvent e) { closeButton.setBackground(new Color(45, 45, 45)); }
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                closeButton.setBackground(Color.RED);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                closeButton.setBackground(new Color(45, 45, 45));
+            }
         });
 
         titleBar.add(titleLabel, BorderLayout.WEST);
@@ -244,10 +265,14 @@ public class Main {
 
         final Point[] dragOffset = new Point[1];
         titleBar.addMouseListener(new MouseAdapter() {
-            @Override public void mousePressed(MouseEvent e) { dragOffset[0] = e.getPoint(); }
+            @Override
+            public void mousePressed(MouseEvent e) {
+                dragOffset[0] = e.getPoint();
+            }
         });
         titleBar.addMouseMotionListener(new MouseAdapter() {
-            @Override public void mouseDragged(MouseEvent e) {
+            @Override
+            public void mouseDragged(MouseEvent e) {
                 Point p = frame.getLocation();
                 p.translate(e.getX() - dragOffset[0].x, e.getY() - dragOffset[0].y);
                 frame.setLocation(p);
@@ -268,8 +293,17 @@ public class Main {
             btn.setFont(UI_FONT);
             btn.setPreferredSize(new Dimension(80, 35));
             btn.addMouseListener(new MouseAdapter() {
-                @Override public void mouseEntered(MouseEvent e) { btn.setBackground(BTN_HOVER); btn.setBorder(BorderFactory.createLineBorder(BTN_HOVER_BORDER, 1)); }
-                @Override public void mouseExited(MouseEvent e) { btn.setBackground(BTN_BG); btn.setBorder(BorderFactory.createLineBorder(BTN_BORDER, 1)); }
+                @Override
+                public void mouseEntered(MouseEvent e) {
+                    btn.setBackground(BTN_HOVER);
+                    btn.setBorder(BorderFactory.createLineBorder(BTN_HOVER_BORDER, 1));
+                }
+
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    btn.setBackground(BTN_BG);
+                    btn.setBorder(BorderFactory.createLineBorder(BTN_BORDER, 1));
+                }
             });
         }
         navPanel.add(tmpfsNavButton);
@@ -283,10 +317,19 @@ public class Main {
         runButton.setFocusPainted(false);
         runButton.setFont(UI_FONT);
         runButton.setPreferredSize(new Dimension(100, 35));
-        if (enabled) applySelected(runButton); else applyNormal(runButton);
+        if (enabled) applySelected(runButton);
+        else applyNormal(runButton);
         runButton.addMouseListener(new MouseAdapter() {
-            @Override public void mouseEntered(MouseEvent e) { applyHover(runButton); }
-            @Override public void mouseExited(MouseEvent e) { if (enabled) applySelected(runButton); else applyNormal(runButton); }
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                applyHover(runButton);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                if (enabled) applySelected(runButton);
+                else applyNormal(runButton);
+            }
         });
         runButton.addActionListener(e -> runToggleScriptAsync());
 
@@ -396,12 +439,19 @@ public class Main {
                         try {
                             Files.walk(savesPath)
                                     .sorted(Comparator.reverseOrder())
-                                    .forEach(p -> { try { Files.deleteIfExists(p); } catch (IOException ignored) {} });
-                        } catch (IOException ignored) {}
+                                    .forEach(p -> {
+                                        try {
+                                            Files.deleteIfExists(p);
+                                        } catch (IOException ignored) {
+                                        }
+                                    });
+                        } catch (IOException ignored) {
+                        }
                     }
                     try {
                         Files.createSymbolicLink(savesPath, lingleDir);
-                    } catch (FileAlreadyExistsException ignored) {}
+                    } catch (FileAlreadyExistsException ignored) {
+                    }
                 }
                 instanceCount = selected.size();
                 saveCurrentState();
@@ -421,7 +471,10 @@ public class Main {
         savesChecks.setBackground(BG);
 
         Path savesDir = home.resolve(".local").resolve("share").resolve("lingle").resolve("saves");
-        try { if (!Files.exists(savesDir)) Files.createDirectories(savesDir); } catch (IOException ignored) {}
+        try {
+            if (!Files.exists(savesDir)) Files.createDirectories(savesDir);
+        } catch (IOException ignored) {
+        }
 
         int saveRows = 0;
         try {
@@ -624,10 +677,14 @@ public class Main {
         try {
             int v = Integer.parseInt(s.trim());
             return v > 0 ? v : fallback;
-        } catch (Exception e) { return fallback; }
+        } catch (Exception e) {
+            return fallback;
+        }
     }
 
-    private static String buttonText() { return enabled ? "Disable" : "Enable"; }
+    private static String buttonText() {
+        return enabled ? "Disable" : "Enable";
+    }
 
     private static void runToggleScriptAsync() {
         long t = System.currentTimeMillis();
@@ -658,9 +715,11 @@ public class Main {
                 if (ec == 0) {
                     enabled = !runDisable;
                     runButton.setText(buttonText());
-                    if (enabled) applySelected(runButton); else applyNormal(runButton);
+                    if (enabled) applySelected(runButton);
+                    else applyNormal(runButton);
                     saveCurrentState();
-                    if (adwEnabled) startAdwIfNeeded(); else stopAdwQuietly();
+                    if (adwEnabled) startAdwIfNeeded();
+                    else stopAdwQuietly();
                 } else {
                     showDarkMessage(null, "Lingle", "Failed to execute task. Exit code: " + ec);
                 }
@@ -681,12 +740,18 @@ public class Main {
                 Path link = dstDir.resolve(map);
                 if (Files.exists(link)) {
                     if (Files.isSymbolicLink(link)) {
-                        try { Files.deleteIfExists(link); } catch (IOException ignored) {}
+                        try {
+                            Files.deleteIfExists(link);
+                        } catch (IOException ignored) {
+                        }
                     } else {
                         continue;
                     }
                 }
-                try { Files.createSymbolicLink(link, target); } catch (FileAlreadyExistsException ignored) {}
+                try {
+                    Files.createSymbolicLink(link, target);
+                } catch (FileAlreadyExistsException ignored) {
+                }
             }
         }
     }
@@ -702,8 +767,9 @@ public class Main {
         String userHome = home.toString();
         StringBuilder sb = new StringBuilder();
         sb.append("#!/bin/bash\nset -e\n\nfor k in {1..").append(instanceCount).append("}\ndo\n");
+        sb.append("  mkdir -p \"").append(userHome).append("/Lingle/$k\"\n");
         for (String map : selectedPracticeMaps) {
-            sb.append("  ln -s \"").append(userHome)
+            sb.append("  ln -sf \"").append(userHome)
                     .append("/.local/share/lingle/saves/").append(map)
                     .append("\" \"").append(userHome).append("/Lingle/$k/\"\n");
         }
@@ -780,63 +846,68 @@ public class Main {
         try {
             if (adwProcess != null) {
                 adwProcess.destroy();
-                try { adwProcess.waitFor(); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+                try {
+                    adwProcess.waitFor();
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) {
+        }
         adwProcess = null;
     }
 
     private static String enableScriptContent() {
         return """
-#!/bin/bash
-set -euo pipefail
-
-USER_NAME="$(logname 2>/dev/null || id -un)"
-USER_HOME="$(getent passwd "${USER_NAME}" | cut -d: -f6)"
-USER_UID="$(id -u "${USER_NAME}")"
-USER_GID="$(id -g "${USER_NAME}")"
-TARGET="${USER_HOME}/Lingle"
-SIZE="4g"
-
-COMMENT="# LINGLE tmpfs"
-LINE="tmpfs ${TARGET} tmpfs defaults,size=${SIZE},uid=${USER_UID},gid=${USER_GID},mode=0700 0 0"
-
-if ! grep -qF "${LINE}" /etc/fstab; then
-  echo "${COMMENT}" >> /etc/fstab
-  echo "${LINE}" >> /etc/fstab
-fi
-
-if ! /usr/bin/mountpoint -q "${TARGET}"; then
-  mount -t tmpfs -o size=4G,uid=$(id -u),gid=$(id -g),mode=700 tmpfs "${TARGET}"
-fi
-
-exit 0
-""";
+                #!/bin/bash
+                set -euo pipefail
+                
+                USER_NAME="$(logname 2>/dev/null || id -un)"
+                USER_HOME="$(getent passwd "${USER_NAME}" | cut -d: -f6)"
+                USER_UID="$(id -u "${USER_NAME}")"
+                USER_GID="$(id -g "${USER_NAME}")"
+                TARGET="${USER_HOME}/Lingle"
+                SIZE="4g"
+                
+                COMMENT="# LINGLE tmpfs"
+                LINE="tmpfs ${TARGET} tmpfs defaults,size=${SIZE},uid=${USER_UID},gid=${USER_GID},mode=0700 0 0"
+                
+                if ! grep -qF "${LINE}" /etc/fstab; then
+                  echo "${COMMENT}" >> /etc/fstab
+                  echo "${LINE}" >> /etc/fstab
+                fi
+                
+                if ! /usr/bin/mountpoint -q "${TARGET}"; then
+                  mount -t tmpfs -o size=4G,uid=$(id -u),gid=$(id -g),mode=700 tmpfs "${TARGET}"
+                fi
+                
+                exit 0
+                """;
     }
 
     private static String disableScriptContent() {
         return """
-#!/bin/bash
-set -euo pipefail
-
-USER_NAME="$(logname 2>/dev/null || id -un)"
-USER_HOME="$(getent passwd "${USER_NAME}" | cut -d: -f6)"
-TARGET="${USER_HOME}/Lingle"
-
-COMMENT="# LINGLE tmpfs"
-LINE="tmpfs ${TARGET} tmpfs defaults,size=${SIZE},uid=${USER_UID},gid=${USER_GID},mode=0700 0 0"
-
-if /usr/bin/mountpoint -q "${TARGET}"; then
-  umount "${TARGET}"
-fi
-
-if grep -qF "${LINE}" /etc/fstab; then
-  grep -v "${COMMENT}" /etc/fstab | grep -v "${LINE}" > /tmp/fstab.tmp
-  mv /tmp/fstab.tmp /etc/fstab
-fi
-
-exit 0
-""";
+                #!/bin/bash
+                set -euo pipefail
+                
+                USER_NAME="$(logname 2>/dev/null || id -un)"
+                USER_HOME="$(getent passwd "${USER_NAME}" | cut -d: -f6)"
+                TARGET="${USER_HOME}/Lingle"
+                
+                COMMENT="# LINGLE tmpfs"
+                LINE="tmpfs ${TARGET} tmpfs defaults,size=${SIZE},uid=${USER_UID},gid=${USER_GID},mode=0700 0 0"
+                
+                if /usr/bin/mountpoint -q "${TARGET}"; then
+                  umount "${TARGET}"
+                fi
+                
+                if grep -qF "${LINE}" /etc/fstab; then
+                  grep -v "${COMMENT}" /etc/fstab | grep -v "${LINE}" > /tmp/fstab.tmp
+                  mv /tmp/fstab.tmp /etc/fstab
+                fi
+                
+                exit 0
+                """;
     }
 
     private static void ensureScriptsPresent() throws IOException {
@@ -916,7 +987,8 @@ exit 0
             sb.append("  \"adwInterval\": ").append(Math.max(1, adwIntervalSeconds)).append("\n");
             sb.append("}\n");
             Files.writeString(cfg, sb.toString(), StandardCharsets.UTF_8);
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
     }
 
     private static void showDarkMessage(Component parent, String title, String message) {
@@ -928,14 +1000,14 @@ exit 0
         JPanel root = new JPanel(new BorderLayout(14, 14));
         root.setBackground(BG);
         root.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(100,100,100), 1),
-                BorderFactory.createEmptyBorder(18,18,18,18)
+                BorderFactory.createLineBorder(new Color(100, 100, 100), 1),
+                BorderFactory.createEmptyBorder(18, 18, 18, 18)
         ));
 
         JLabel header = new JLabel(title);
         header.setForeground(TXT);
         header.setFont(new Font("SansSerif", Font.BOLD, 16));
-        header.setBorder(BorderFactory.createEmptyBorder(0,0,6,0));
+        header.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
         root.add(header, BorderLayout.NORTH);
 
         int wrapWidth = 460;
@@ -946,7 +1018,7 @@ exit 0
         ta.setOpaque(false);
         ta.setForeground(TXT);
         ta.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        ta.setBorder(BorderFactory.createEmptyBorder(6,8,6,8));
+        ta.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
         ta.setSize(new Dimension(wrapWidth, Short.MAX_VALUE));
         Dimension pref = ta.getPreferredSize();
         ta.setPreferredSize(new Dimension(wrapWidth, pref.height));
@@ -967,23 +1039,23 @@ exit 0
         d.setVisible(true);
     }
 
-    private static int InstancelinkWarn (Component parent) {
+    private static int InstancelinkWarn(Component parent) {
         final int[] result = {-1};
         JDialog d = new JDialog(SwingUtilities.getWindowAncestor(parent), "Symlinking Confirmation", Dialog.ModalityType.APPLICATION_MODAL);
         d.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         d.setResizable(false);
 
-        JPanel root = new JPanel(new BorderLayout(14,14));
+        JPanel root = new JPanel(new BorderLayout(14, 14));
         root.setBackground(BG);
         root.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(100,100,100), 1),
-                BorderFactory.createEmptyBorder(18,18,18,18)
+                BorderFactory.createLineBorder(new Color(100, 100, 100), 1),
+                BorderFactory.createEmptyBorder(18, 18, 18, 18)
         ));
 
         JLabel header = new JLabel("WARNING");
         header.setForeground(TXT);
         header.setFont(new Font("SansSerif", Font.BOLD, 18));
-        header.setBorder(BorderFactory.createEmptyBorder(0,0,6,0));
+        header.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
         root.add(header, BorderLayout.NORTH);
 
         int wrapWidth = 460;
@@ -994,7 +1066,7 @@ exit 0
         ta.setOpaque(false);
         ta.setForeground(TXT);
         ta.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        ta.setBorder(BorderFactory.createEmptyBorder(6,8,6,8));
+        ta.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
         ta.setSize(new Dimension(wrapWidth, Short.MAX_VALUE));
         Dimension pref = ta.getPreferredSize();
         ta.setPreferredSize(new Dimension(wrapWidth, pref.height));
@@ -1006,8 +1078,14 @@ exit 0
         JButton no = new JButton("Go Back");
         styleWithHover(yes);
         styleWithHover(no);
-        yes.addActionListener(e -> { result[0] = 0; d.dispose(); });
-        no.addActionListener(e -> { result[0] = 1; d.dispose(); });
+        yes.addActionListener(e -> {
+            result[0] = 0;
+            d.dispose();
+        });
+        no.addActionListener(e -> {
+            result[0] = 1;
+            d.dispose();
+        });
         btns.add(no);
         btns.add(yes);
         root.add(btns, BorderLayout.SOUTH);
@@ -1020,23 +1098,23 @@ exit 0
         return result[0];
     }
 
-    private static int DirectoriesWarn (Component parent) {
+    private static int DirectoriesWarn(Component parent) {
         final int[] result = {-1};
         JDialog d = new JDialog(SwingUtilities.getWindowAncestor(parent), "Create Directories Confirmation", Dialog.ModalityType.APPLICATION_MODAL);
         d.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         d.setResizable(false);
 
-        JPanel root = new JPanel(new BorderLayout(14,14));
+        JPanel root = new JPanel(new BorderLayout(14, 14));
         root.setBackground(BG);
         root.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(100,100,100), 1),
-                BorderFactory.createEmptyBorder(18,18,18,18)
+                BorderFactory.createLineBorder(new Color(100, 100, 100), 1),
+                BorderFactory.createEmptyBorder(18, 18, 18, 18)
         ));
 
         JLabel header = new JLabel("Confirmation");
         header.setForeground(TXT);
         header.setFont(new Font("SansSerif", Font.BOLD, 18));
-        header.setBorder(BorderFactory.createEmptyBorder(0,0,6,0));
+        header.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
         root.add(header, BorderLayout.NORTH);
 
         int wrapWidth = 460;
@@ -1047,7 +1125,7 @@ exit 0
         ta.setOpaque(false);
         ta.setForeground(TXT);
         ta.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        ta.setBorder(BorderFactory.createEmptyBorder(6,8,6,8));
+        ta.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
         ta.setSize(new Dimension(wrapWidth, Short.MAX_VALUE));
         Dimension pref = ta.getPreferredSize();
         ta.setPreferredSize(new Dimension(wrapWidth, pref.height));
@@ -1059,8 +1137,14 @@ exit 0
         JButton no = new JButton("Go Back");
         styleWithHover(yes);
         styleWithHover(no);
-        yes.addActionListener(e -> { result[0] = 0; d.dispose(); });
-        no.addActionListener(e -> { result[0] = 1; d.dispose(); });
+        yes.addActionListener(e -> {
+            result[0] = 0;
+            d.dispose();
+        });
+        no.addActionListener(e -> {
+            result[0] = 1;
+            d.dispose();
+        });
         btns.add(no);
         btns.add(yes);
         root.add(btns, BorderLayout.SOUTH);
@@ -1075,24 +1159,26 @@ exit 0
 
     private static void installCreateDirsService(JFrame parent) {
         try {
+            String userHome = System.getProperty("user.home");
+
             String service = """
-        [Unit]
-        Description=Create Lingle instance directories on startup
-        After=local-fs.target
+                [Unit]
+                Description=Create Lingle instance directories on startup
+                After=graphical-session.target
+                Requires=graphical-session.target
 
-        [Service]
-        Type=oneshot
-        ExecStart=%h/.local/share/lingle/scripts/link_practice_maps.sh
-        RemainAfterExit=yes
+                [Service]
+                Type=oneshot
+                ExecStart=/.local/share/lingle/scripts/link_practice_maps.sh
+                RemainAfterExit=yes
 
-        [Install]
-        WantedBy=default.target
-        """;
+                [Install]
+                WantedBy=default.target
+                    """.formatted(userHome);
 
             Path tmp = Files.createTempFile("lingle-tmpfs-service", ".service");
             Files.writeString(tmp, service, StandardCharsets.UTF_8);
 
-            String userHome = System.getProperty("user.home");
             String target = userHome + "/.config/systemd/user/tmpfs.service";
 
             ProcessBuilder pb = new ProcessBuilder(
