@@ -518,6 +518,11 @@ public class Main {
         createDirsBtn.addActionListener(e -> {
             int choice = DirectoriesWarn(frame);
             if (choice != 0) return;
+            try {
+                PracticeMapLinking();
+            } catch (IOException ex) {
+                showDarkMessage(frame, "Error", "Failed to generate linking script: " + ex.getMessage());
+            }
             installCreateDirsService(frame);
         });
 
@@ -656,9 +661,6 @@ public class Main {
                     if (enabled) applySelected(runButton); else applyNormal(runButton);
                     saveCurrentState();
                     if (adwEnabled) startAdwIfNeeded(); else stopAdwQuietly();
-                    if (enabled && practiceMaps) {
-                        try { runPracticeMapLinkingIfNeeded(); } catch (IOException ignored) {}
-                    }
                 } else {
                     showDarkMessage(null, "Lingle", "Failed to execute task. Exit code: " + ec);
                 }
@@ -689,7 +691,7 @@ public class Main {
         }
     }
 
-    private static void runPracticeMapLinkingIfNeeded() throws IOException {
+    private static void PracticeMapLinking() throws IOException {
         if (!practiceMaps || !enabled) return;
         if (instanceCount <= 0 || selectedPracticeMaps.isEmpty()) return;
 
@@ -1074,33 +1076,39 @@ exit 0
     private static void installCreateDirsService(JFrame parent) {
         try {
             String service = """
-            [Unit]
-            Description=Create Lingle instance directories on startup
-            After=local-fs.target
+        [Unit]
+        Description=Create Lingle instance directories on startup
+        After=local-fs.target
 
-            [Service]
-            Type=oneshot
-            ExecStart=%h/.local/share/lingle/scripts/folders.tmpfs
-            RemainAfterExit=yes
+        [Service]
+        Type=oneshot
+        ExecStart=%h/.local/share/lingle/scripts/link_practice_maps.sh
+        RemainAfterExit=yes
 
-            [Install]
-            WantedBy=multi-user.target
-            """;
+        [Install]
+        WantedBy=default.target
+        """;
 
             Path tmp = Files.createTempFile("lingle-tmpfs-service", ".service");
             Files.writeString(tmp, service, StandardCharsets.UTF_8);
 
+            String userHome = System.getProperty("user.home");
+            String target = userHome + "/.config/systemd/user/tmpfs.service";
+
             ProcessBuilder pb = new ProcessBuilder(
-                    "sudo", "bash", "-c",
-                    "mv " + tmp.toAbsolutePath() + " /etc/systemd/system/tmpfs.service && systemctl enable tmpfs.service"
+                    "bash", "-c",
+                    "mkdir -p " + userHome + "/.config/systemd/user && " +
+                            "mv " + tmp.toAbsolutePath() + " " + target + " && " +
+                            "systemctl --user daemon-reload && " +
+                            "systemctl --user enable tmpfs.service"
             );
             pb.inheritIO();
             int exit = pb.start().waitFor();
 
             if (exit == 0) {
-                showDarkMessage(parent, "Success", "Systemd service installed and enabled.");
+                showDarkMessage(parent, "Success", "User systemd service installed and enabled.");
             } else {
-                showDarkMessage(parent, "Error", "Failed to install service. Exit code: 3" + exit);
+                showDarkMessage(parent, "Error", "Failed to install service. Exit code: " + exit);
             }
         } catch (Exception e) {
             showDarkMessage(parent, "Error", "Exception: " + e.getMessage());
