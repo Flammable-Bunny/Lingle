@@ -5,11 +5,11 @@ plugins {
 }
 
 application {
-    mainClass.set("meow.bunny.Main")
+    mainClass.set("flammable.bunny.Main")
 }
 
 
-group = "meow.bunny"
+group = "flammable.bunny"
 version = "0.5.5"
 
 repositories {

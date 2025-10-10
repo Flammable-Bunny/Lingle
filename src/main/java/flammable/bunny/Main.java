@@ -1,4 +1,4 @@
-package meow.bunny;
+package flammable.bunny;
 
 import javax.swing.*;
 import java.awt.*;
@@ -101,7 +101,7 @@ public class Main {
 
     private static void checkForUpdates() {
         try {
-            URL url = new URL("https://api.github.com/repos/Flammable-Bunny/Lingle/releases/latest");
+            URL url = new URL("https://api.github.com/repos/Flammable-Bunny/Lingle/releases/");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
             conn.setConnectTimeout(5000);
@@ -1174,7 +1174,7 @@ public class Main {
 
                 [Install]
                 WantedBy=default.target
-                    """.formatted(userHome);
+                   \s""".formatted(userHome);
 
             Path tmp = Files.createTempFile("lingle-tmpfs-service", ".service");
             Files.writeString(tmp, service, StandardCharsets.UTF_8);
