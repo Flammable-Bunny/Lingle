@@ -1,13 +1,7 @@
 plugins {
     application
-    id("java")
     id("com.gradleup.shadow") version "9.2.2"
 }
-
-application {
-    mainClass.set("flammable.bunny.Main")
-}
-
 
 group = "flammable.bunny"
 version = "0.5.5"
@@ -22,13 +16,18 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-tasks.test {
-    useJUnitPlatform()
+application {
+    mainClass.set("flammable.bunny.Main")
 }
+
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(17))
     }
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 tasks.withType<JavaCompile> {
@@ -39,4 +38,11 @@ tasks.shadowJar {
     archiveBaseName.set("Lingle")
     archiveVersion.set(version.toString())
     archiveClassifier.set("")
+}
+
+sourceSets {
+    named("main") {
+        java.srcDirs("src/main/java")
+        resources.srcDirs("src/main/resources")
+    }
 }
