@@ -12,5 +12,4 @@ public class UIConstants {
     public static final Color TXT = Color.WHITE;
     public static final Font UI_FONT = new Font("SansSerif", Font.PLAIN, 13);
     public static final Font UI_FONT_BOLD = new Font("SansSerif", Font.BOLD, 14);
-    public static final int ROW_HEIGHT = 22;
 }

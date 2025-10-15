@@ -11,6 +11,7 @@ public class TmpfsScriptManager {
         Path base = home.resolve(".local/share/lingle");
         Path scriptsDir = base.resolve("scripts");
         Path savesDir = base.resolve("saves");
+
         Files.createDirectories(scriptsDir);
         Files.createDirectories(savesDir);
 
@@ -38,13 +39,15 @@ public class TmpfsScriptManager {
                 COMMENT="# LINGLE tmpfs"
                 LINE="tmpfs ${TARGET} tmpfs defaults,size=${SIZE},uid=${USER_UID},gid=${USER_GID},mode=0700 0 0"
 
+                # Add entry if not exists
                 if ! grep -qF "${LINE}" /etc/fstab; then
-                  echo "${COMMENT}" >> /etc/fstab
-                  echo "${LINE}" >> /etc/fstab
+                  echo "${COMMENT}" | sudo tee -a /etc/fstab >/dev/null
+                  echo "${LINE}" | sudo tee -a /etc/fstab >/dev/null
                 fi
 
-                if ! /usr/bin/mountpoint -q "${TARGET}"; then
-                  mount -t tmpfs -o size=4G,uid=$(id -u),gid=$(id -g),mode=700 tmpfs "${TARGET}"
+                # Mount with pkexec so GNOME auth agent works
+                if ! mountpoint -q "${TARGET}"; then
+                  pkexec mount -t tmpfs -o size=${SIZE},uid=${USER_UID},gid=${USER_GID},mode=700 tmpfs "${TARGET}"
                 fi
                 """;
     }
@@ -56,18 +59,21 @@ public class TmpfsScriptManager {
 
                 USER_NAME="$(logname 2>/dev/null || id -un)"
                 USER_HOME="$(getent passwd "${USER_NAME}" | cut -d: -f6)"
+                USER_UID="$(id -u "${USER_NAME}")"
+                USER_GID="$(id -g "${USER_NAME}")"
                 TARGET="${USER_HOME}/Lingle"
+                SIZE="4g"
 
                 COMMENT="# LINGLE tmpfs"
                 LINE="tmpfs ${TARGET} tmpfs defaults,size=${SIZE},uid=${USER_UID},gid=${USER_GID},mode=0700 0 0"
 
-                if /usr/bin/mountpoint -q "${TARGET}"; then
-                  umount "${TARGET}"
+                if mountpoint -q "${TARGET}"; then
+                  pkexec umount "${TARGET}"
                 fi
 
                 if grep -qF "${LINE}" /etc/fstab; then
-                  grep -v "${COMMENT}" /etc/fstab | grep -v "${LINE}" > /tmp/fstab.tmp
-                  mv /tmp/fstab.tmp /etc/fstab
+                  sudo sed -i "/${COMMENT}/d" /etc/fstab
+                  sudo sed -i "\\|${LINE}|d" /etc/fstab
                 fi
                 """;
     }

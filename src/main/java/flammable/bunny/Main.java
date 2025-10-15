@@ -12,7 +12,7 @@ public class Main {
         try {
             TmpfsScriptManager.ensureScriptsPresent();
             LingleState.loadState();
-            LinkManager.preparePracticeMapLinks();
+            LinkInstancesService.preparePracticeMapLinks();
             Updater.checkForUpdates();
             AdwManager.startAdwIfNeeded();
         } catch (IOException e) {
@@ -41,6 +41,6 @@ public class Main {
 
         System.setProperty("awt.useSystemAAFontSettings", "on");
         System.setProperty("swing.aatext", "true");
-        SwingUtilities.invokeLater(LingleFrame::new);
+        SwingUtilities.invokeLater(LingleUI::new);
     }
 }

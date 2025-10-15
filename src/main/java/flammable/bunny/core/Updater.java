@@ -10,7 +10,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Updater {
-    public static final String CURRENT_VERSION = "0.5.5";
+    public static final String CURRENT_VERSION = "0.5.6";
 
     private static int compareVersions(String v1) {
         String[] a1 = v1.replaceFirst("^v", "").split("\\.");

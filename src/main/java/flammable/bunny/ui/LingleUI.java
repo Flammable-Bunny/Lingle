@@ -1,7 +1,12 @@
 package flammable.bunny.ui;
 
-import flammable.bunny.core.*;
+import flammable.bunny.core.AdwManager;
+import flammable.bunny.core.LingleState;
+import flammable.bunny.core.LinkInstancesService;
+import flammable.bunny.core.Updater;
+
 import javax.swing.*;
+import javax.swing.plaf.basic.BasicScrollBarUI;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -14,12 +19,14 @@ import java.util.List;
 import static flammable.bunny.ui.UIConstants.*;
 import static flammable.bunny.ui.UIUtils.*;
 
-public class LingleFrame extends JFrame {
+public class LingleUI extends JFrame {
 
     private JButton runButton;
     private long lastClickTime;
 
-    public LingleFrame() {
+    private static final int ROW_H = 22;
+
+    public LingleUI() {
         super("Lingle");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setAlwaysOnTop(true);
@@ -27,7 +34,7 @@ public class LingleFrame extends JFrame {
         setResizable(false);
         setUndecorated(true);
 
-        // Title bar
+        // ===== Title bar =====
         JPanel titleBar = new JPanel(new BorderLayout());
         titleBar.setBackground(new Color(45, 45, 45));
         titleBar.setPreferredSize(new Dimension(0, 25));
@@ -51,7 +58,7 @@ public class LingleFrame extends JFrame {
         titleBar.add(titleLabel, BorderLayout.WEST);
         titleBar.add(closeButton, BorderLayout.EAST);
 
-        // Window drag
+        // Drag window
         final Point dragOffset = new Point();
         titleBar.addMouseListener(new MouseAdapter() {
             @Override public void mousePressed(MouseEvent e) { dragOffset.setLocation(e.getPoint()); }
@@ -64,7 +71,7 @@ public class LingleFrame extends JFrame {
             }
         });
 
-        // Nav bar
+        // ===== Nav bar (unchanged) =====
         JPanel navPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
         navPanel.setBackground(BG);
         navPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(100, 100, 100)));
@@ -92,12 +99,12 @@ public class LingleFrame extends JFrame {
         navPanel.add(tmpfsNavButton);
         navPanel.add(settingsNavButton);
 
-        // Main content
+        // ===== Main content card =====
         CardLayout cardLayout = new CardLayout();
         JPanel contentPanel = new JPanel(cardLayout);
         contentPanel.setBackground(BG);
 
-        // TMPFS Section
+        // ===== TMPFS + lists =====
         runButton = new JButton(LingleState.enabled ? "Disable" : "Enable");
         runButton.setFocusPainted(false);
         runButton.setFont(UI_FONT);
@@ -127,31 +134,38 @@ public class LingleFrame extends JFrame {
         runButton.setBounds(10, 40, 100, 35);
         buttonSection.add(runButton);
 
-        // Instances section
+        // ===== Left column container (everything below TMPFS block) =====
+        JPanel mainListContainer = new JPanel();
+        mainListContainer.setLayout(new BoxLayout(mainListContainer, BoxLayout.Y_AXIS));
+        mainListContainer.setBackground(BG);
+        // indent to match the Enable button’s left edge
+        mainListContainer.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
+
+        // ===== Instances =====
         JLabel instancesLabel = new JLabel("Instances:");
         instancesLabel.setForeground(TXT);
         instancesLabel.setFont(UI_FONT_BOLD);
-        instancesLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
+        instancesLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 5, 0));
         instancesLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        mainListContainer.add(instancesLabel);
 
         JPanel instancesChecks = new JPanel();
         instancesChecks.setLayout(new BoxLayout(instancesChecks, BoxLayout.Y_AXIS));
         instancesChecks.setBackground(BG);
+        instancesChecks.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         Path home = Path.of(System.getProperty("user.home"));
         Path prismInstancesDir = home.resolve(".local/share/PrismLauncher/instances");
+
         int instRows = 0;
         try {
             if (Files.exists(prismInstancesDir) && Files.isDirectory(prismInstancesDir)) {
                 for (Path dir : Files.list(prismInstancesDir)
                         .filter(Files::isDirectory)
+                        .filter(p -> !p.getFileName().toString().equals(".tmp")) // hide .tmp
                         .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()))
                         .toList()) {
-                    JCheckBox cb = new JCheckBox(dir.getFileName().toString());
-                    cb.setBackground(BG);
-                    cb.setForeground(TXT);
-                    cb.setFont(UI_FONT);
-                    cb.setBorder(BorderFactory.createEmptyBorder(2, 10, 2, 10));
+                    JCheckBox cb = createStyledCheckBox(dir.getFileName().toString());
                     cb.setAlignmentX(Component.LEFT_ALIGNMENT);
                     instancesChecks.add(cb);
                     instRows++;
@@ -162,35 +176,41 @@ public class LingleFrame extends JFrame {
                 none.setForeground(Color.LIGHT_GRAY);
                 none.setFont(new Font("SansSerif", Font.ITALIC, 12));
                 instancesChecks.add(none);
+                instRows = 1;
             }
         } catch (IOException e) {
             JLabel err = new JLabel("Error reading instances directory");
             err.setForeground(Color.RED);
             err.setFont(new Font("SansSerif", Font.ITALIC, 12));
             instancesChecks.add(err);
+            instRows = 1;
         }
 
-        JScrollPane instancesScroll = new JScrollPane(instancesChecks);
-        instancesScroll.setBackground(BG);
-        instancesScroll.getViewport().setBackground(BG);
-        instancesScroll.setBorder(BorderFactory.createEmptyBorder());
+        JScrollPane instancesScroll = makeScroll(instancesChecks);
+        int instVisible = Math.max(1, Math.min(instRows, 5));
+        instancesScroll.setPreferredSize(new Dimension(Integer.MAX_VALUE, instVisible * ROW_H));
+        instancesScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 5 * ROW_H));
+        instancesScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
+        mainListContainer.add(instancesScroll);
 
-        JButton symlinkButton = new JButton("Symlink Instances");
-        symlinkButton.setFocusPainted(false);
-        symlinkButton.setFont(UI_FONT);
-        symlinkButton.setPreferredSize(new Dimension(180, 35));
-        styleWithHover(symlinkButton);
+        JButton symlinkButton = makeButton("Symlink Instances", 180);
+        JPanel symlinkRow = leftRow();
+        symlinkRow.add(symlinkButton);
+        mainListContainer.add(Box.createVerticalStrut(15));
+        mainListContainer.add(symlinkRow);
 
-        // Practice maps
+        // ===== Practice maps =====
         JLabel savesLabel = new JLabel("Practice Maps:");
         savesLabel.setForeground(TXT);
         savesLabel.setFont(UI_FONT_BOLD);
-        savesLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
+        savesLabel.setBorder(BorderFactory.createEmptyBorder(20, 0, 5, 0));
         savesLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        mainListContainer.add(savesLabel);
 
         JPanel savesChecks = new JPanel();
         savesChecks.setLayout(new BoxLayout(savesChecks, BoxLayout.Y_AXIS));
         savesChecks.setBackground(BG);
+        savesChecks.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         Path savesDir = home.resolve(".local/share/lingle/saves");
         int saveRows = 0;
@@ -200,66 +220,69 @@ public class LingleFrame extends JFrame {
                     .filter(Files::isDirectory)
                     .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()))
                     .toList()) {
-                JCheckBox cb = new JCheckBox(dir.getFileName().toString());
-                cb.setBackground(BG);
-                cb.setForeground(TXT);
-                cb.setFont(UI_FONT);
-                cb.setBorder(BorderFactory.createEmptyBorder(2, 10, 2, 10));
+
+                String raw = dir.getFileName().toString();
+
+                // If name starts with "_" rename once to drop the underscore
+                if (raw.startsWith("_")) {
+                    Path to = dir.getParent().resolve(raw.substring(1));
+                    if (!Files.exists(to)) {
+                        try { Files.move(dir, to); raw = to.getFileName().toString(); }
+                        catch (IOException ignored) { /* fall through and just show it trimmed */ }
+                    } else {
+                        raw = raw.substring(1);
+                    }
+                }
+
+                // Hide "Z_" visually (don’t rename on disk)
+                String display = raw.startsWith("Z_") ? raw.substring(2) : raw;
+
+                JCheckBox cb = createStyledCheckBox(display);
                 cb.setAlignmentX(Component.LEFT_ALIGNMENT);
                 savesChecks.add(cb);
                 saveRows++;
+            }
+            if (saveRows == 0) {
+                JLabel none = new JLabel("No practice maps found");
+                none.setForeground(Color.LIGHT_GRAY);
+                none.setFont(new Font("SansSerif", Font.ITALIC, 12));
+                savesChecks.add(none);
+                saveRows = 1;
             }
         } catch (IOException e) {
             JLabel err = new JLabel("Error reading practice maps directory");
             err.setForeground(Color.RED);
             err.setFont(new Font("SansSerif", Font.ITALIC, 12));
             savesChecks.add(err);
+            saveRows = 1;
         }
 
-        JScrollPane savesScroll = new JScrollPane(savesChecks);
-        savesScroll.setBackground(BG);
-        savesScroll.getViewport().setBackground(BG);
-        savesScroll.setBorder(BorderFactory.createEmptyBorder());
+        JScrollPane savesScroll = makeScroll(savesChecks);
+        int savesVisible = Math.max(1, Math.min(saveRows, 9));
+        savesScroll.setPreferredSize(new Dimension(Integer.MAX_VALUE, savesVisible * ROW_H));
+        savesScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 9 * ROW_H));
         savesScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
+        mainListContainer.add(savesScroll);
 
-        JButton linkPracticeBtn = new JButton("Link Practice Maps");
-        linkPracticeBtn.setFocusPainted(false);
-        linkPracticeBtn.setFont(UI_FONT);
-        linkPracticeBtn.setPreferredSize(new Dimension(220, 35));
-        styleWithHover(linkPracticeBtn);
+        JButton linkPracticeBtn = makeButton("Link Practice Maps", 220);
+        JButton createDirsBtn = makeButton("Create Directories on Startup", 240);
 
-        JButton createDirsBtn = new JButton("Create Directories on Startup");
-        createDirsBtn.setFocusPainted(false);
-        createDirsBtn.setFont(UI_FONT);
-        createDirsBtn.setPreferredSize(new Dimension(240, 35));
-        styleWithHover(createDirsBtn);
+        JPanel linkRow = leftRow();
+        linkRow.add(linkPracticeBtn);
+        JPanel dirsRow = leftRow();
+        dirsRow.add(createDirsBtn);
 
-        // Layout correction
-        JPanel mapsPanel = new JPanel();
-        mapsPanel.setLayout(new BoxLayout(mapsPanel, BoxLayout.Y_AXIS));
-        mapsPanel.setBackground(BG);
-        mapsPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        mapsPanel.add(Box.createVerticalStrut(10));
+        mainListContainer.add(Box.createVerticalStrut(15));
+        mainListContainer.add(linkRow);
+        mainListContainer.add(Box.createVerticalStrut(12));
+        mainListContainer.add(dirsRow);
+        mainListContainer.add(Box.createVerticalStrut(20));
 
-        JPanel linkPracticeWrapper = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        linkPracticeWrapper.setBackground(BG);
-        linkPracticeWrapper.setAlignmentX(Component.LEFT_ALIGNMENT);
-        linkPracticeWrapper.add(linkPracticeBtn);
-        mapsPanel.add(linkPracticeWrapper);
-
-        mapsPanel.add(Box.createVerticalStrut(12));
-
-        JPanel createDirsWrapper = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        createDirsWrapper.setBackground(BG);
-        createDirsWrapper.setAlignmentX(Component.LEFT_ALIGNMENT);
-        createDirsWrapper.add(createDirsBtn);
-        mapsPanel.add(createDirsWrapper);
-
-        // Auto delete
+        // ===== ADW =====
         JLabel adwLabel = new JLabel("Auto Delete Worlds:");
         adwLabel.setForeground(TXT);
         adwLabel.setFont(UI_FONT_BOLD);
-        adwLabel.setBorder(BorderFactory.createEmptyBorder(15, 10, 5, 10));
+        adwLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 5, 0));
         adwLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JToggleButton adwToggle = new JToggleButton("Auto Delete Worlds");
@@ -272,64 +295,104 @@ public class LingleFrame extends JFrame {
         adwInterval.setPreferredSize(new Dimension(70, 30));
         adwInterval.setFont(UI_FONT);
 
-        JButton adwApply = new JButton("Apply");
-        styleWithHover(adwApply);
-        adwApply.setPreferredSize(new Dimension(90, 30));
+        JButton adwApply = makeButton("Apply", 90);
         JLabel secondsLbl = new JLabel("seconds");
         secondsLbl.setForeground(TXT);
         secondsLbl.setFont(UI_FONT);
 
-        JPanel adwRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
-        adwRow.setBackground(BG);
-        adwRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JPanel adwRow = leftRow();
         adwRow.add(adwToggle);
         adwRow.add(new JLabel("Interval:"));
         adwRow.add(adwInterval);
         adwRow.add(secondsLbl);
         adwRow.add(adwApply);
 
-        // Main assembly (left aligned)
-        JPanel mainListContainer = new JPanel();
-        mainListContainer.setLayout(new BoxLayout(mainListContainer, BoxLayout.Y_AXIS));
-        mainListContainer.setBackground(BG);
-        mainListContainer.setAlignmentX(Component.LEFT_ALIGNMENT);
-        instancesLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        instancesScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
-        savesLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        savesScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
-        mapsPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        adwLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        adwRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        mainListContainer.add(instancesLabel);
-        mainListContainer.add(instancesScroll);
-        mainListContainer.add(Box.createVerticalStrut(15));
-
-        JPanel symlinkWrapper = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        symlinkWrapper.setBackground(BG);
-        symlinkWrapper.setAlignmentX(Component.LEFT_ALIGNMENT);
-        symlinkWrapper.add(symlinkButton);
-        mainListContainer.add(symlinkWrapper);
-
-        mainListContainer.add(Box.createVerticalStrut(25));
-        mainListContainer.add(savesLabel);
-        mainListContainer.add(savesScroll);
-        mainListContainer.add(Box.createVerticalStrut(15));
-        mainListContainer.add(mapsPanel);
-        mainListContainer.add(Box.createVerticalStrut(25));
         mainListContainer.add(adwLabel);
         mainListContainer.add(adwRow);
 
+        // ===== Wire actions =====
+        symlinkButton.addActionListener(e -> {
+            List<String> instanceNames = new ArrayList<>();
+            for (Component c : instancesChecks.getComponents()) {
+                if (c instanceof JCheckBox cb && cb.isSelected()) {
+                    instanceNames.add(cb.getText());
+                }
+            }
+            if (instanceNames.isEmpty()) {
+                showDarkMessage(this, "No Instances Selected", "Please select at least one instance.");
+                return;
+            }
+            int choice = new SymlinkConfirmationDialog(this).showDialog();
+            if (choice != 0) return;
+            try {
+                LinkInstancesService.symlinkInstances(instanceNames);
+                showDarkMessage(this, "Done", "Symlinks created.");
+            } catch (IOException ex) {
+                showDarkMessage(this, "Error", "Failed to create symlinks:\n" + ex.getMessage());
+            }
+        });
+
+        linkPracticeBtn.addActionListener(e -> {
+            List<String> chosen = new ArrayList<>();
+            for (Component c : savesChecks.getComponents()) {
+                if (c instanceof JCheckBox cb && cb.isSelected()) {
+                    // We display without "Z_". Persist the label as shown.
+                    chosen.add(cb.getText());
+                }
+            }
+            if (chosen.isEmpty()) {
+                showDarkMessage(this, "No Maps Selected", "Please select at least one practice map.");
+                return;
+            }
+            try {
+                LingleState.selectedPracticeMaps = chosen;
+                LingleState.practiceMaps = true;
+                LingleState.saveState();
+                LinkInstancesService.linkPracticeMapsNow();
+                showDarkMessage(this, "Done", "Practice maps linked.");
+            } catch (IOException ex) {
+                showDarkMessage(this, "Error", ex.getMessage());
+            }
+        });
+
+        createDirsBtn.addActionListener(e -> {
+            int choice = new CreateDirsConfirmationDialog(this).showDialog();
+            if (choice != 0) return;
+            try {
+                LinkInstancesService.preparePracticeMapLinks();
+                LinkInstancesService.installCreateDirsService(this);
+            } catch (IOException ex) {
+                showDarkMessage(this, "Error", ex.getMessage());
+            }
+        });
+
+        adwApply.addActionListener(e -> {
+            LingleState.adwEnabled = adwToggle.isSelected();
+            try {
+                int v = Integer.parseInt(adwInterval.getText().trim());
+                if (v > 0) LingleState.adwIntervalSeconds = v;
+            } catch (NumberFormatException ignored) {}
+            LingleState.saveState();
+            if (LingleState.adwEnabled) AdwManager.startAdwIfNeeded();
+            else AdwManager.stopAdwQuietly();
+            showDarkMessage(this, "Updated", "Auto delete settings applied.");
+        });
+
+        // ===== Stack to top =====
         JPanel topStack = new JPanel();
         topStack.setLayout(new BoxLayout(topStack, BoxLayout.Y_AXIS));
         topStack.setBackground(BG);
-        topStack.setAlignmentX(Component.LEFT_ALIGNMENT);
         topStack.add(buttonSection);
         topStack.add(Box.createVerticalStrut(5));
         topStack.add(mainListContainer);
 
-        tmpfsPanel.add(topStack, BorderLayout.NORTH);
+        JPanel alignWrapper = new JPanel(new BorderLayout());
+        alignWrapper.setBackground(BG);
+        alignWrapper.add(topStack, BorderLayout.NORTH);
 
+        tmpfsPanel.add(alignWrapper, BorderLayout.CENTER);
+
+        // ===== Settings stub (unchanged) =====
         JPanel settingsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
         settingsPanel.setBackground(BG);
         JLabel empty = new JLabel("nothing here yet");
@@ -342,6 +405,7 @@ public class LingleFrame extends JFrame {
         tmpfsNavButton.addActionListener(e -> cardLayout.show(contentPanel, "auToMPFS"));
         settingsNavButton.addActionListener(e -> cardLayout.show(contentPanel, " "));
 
+        // ===== Frame =====
         JPanel navAndContent = new JPanel(new BorderLayout());
         navAndContent.add(navPanel, BorderLayout.NORTH);
         navAndContent.add(contentPanel, BorderLayout.CENTER);
@@ -352,9 +416,40 @@ public class LingleFrame extends JFrame {
         mainPanel.setBorder(BorderFactory.createLineBorder(new Color(100, 100, 100), 1));
 
         setContentPane(mainPanel);
-        setSize(525, 775);
+        setSize(525, 790);
         setLocationRelativeTo(null);
         setVisible(true);
+    }
+
+    private static JScrollPane makeScroll(JPanel body) {
+        JScrollPane sp = new JScrollPane(body);
+        sp.setBackground(BG);
+        sp.getViewport().setBackground(BG);
+        sp.setBorder(BorderFactory.createEmptyBorder());
+        sp.getVerticalScrollBar().setUnitIncrement(14);
+        sp.getVerticalScrollBar().setUI(new BasicScrollBarUI() {
+            @Override protected void configureScrollBarColors() {
+                this.thumbColor = new Color(110, 110, 110);
+                this.trackColor = BG;
+            }
+        });
+        return sp;
+    }
+
+    private static JPanel leftRow() {
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        row.setBackground(BG);
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return row;
+    }
+
+    private static JButton makeButton(String text, int w) {
+        JButton b = new JButton(text);
+        b.setFocusPainted(false);
+        b.setFont(UI_FONT);
+        b.setPreferredSize(new Dimension(w, 35));
+        styleWithHover(b);
+        return b;
     }
 
     private void toggleTmpfs() {
@@ -382,13 +477,13 @@ public class LingleFrame extends JFrame {
                 if (ec == 0) {
                     LingleState.enabled = !runDisable;
                     runButton.setText(LingleState.enabled ? "Disable" : "Enable");
-                    if (LingleState.enabled) applySelected(runButton);
-                    else applyNormal(runButton);
+                    if (LingleState.enabled) applySelected(runButton); else applyNormal(runButton);
                     LingleState.saveState();
                     if (LingleState.adwEnabled) AdwManager.startAdwIfNeeded();
                     else AdwManager.stopAdwQuietly();
+                    showDarkMessage(this, "Success", "TMPFS " + (LingleState.enabled ? "enabled." : "disabled."));
                 } else {
-                    showDarkMessage(null, "Lingle", "Failed to execute task. Exit code: " + ec);
+                    showDarkMessage(this, "Lingle", "Failed to execute task. Exit code: " + ec);
                 }
                 runButton.setEnabled(true);
             });
