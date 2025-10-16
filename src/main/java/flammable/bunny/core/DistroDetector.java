@@ -29,6 +29,40 @@ public final class DistroDetector {
         } catch (IOException ignored) {}
     }
 
+    public static String getDistro() {
+        String distro = readDistroFromConfig();
+        if (distro == null || distro.equals("unknown")) {
+            distro = detectDistro();
+        }
+        return distro;
+    }
+
+    public static String getPackageManager() {
+        String distro = getDistro();
+        return switch (distro.toLowerCase()) {
+            case "arch", "endeavouros", "manjaro", "artix", "cachyos", "garuda" -> "pacman";
+            case "debian", "ubuntu", "mint", "pop", "pop!_os", "kali", "elementary", "zorin" -> "apt";
+            case "fedora", "rhel", "centos", "rocky", "almalinux" -> "dnf";
+            case "opensuse", "suse", "opensuse-tumbleweed", "opensuse-leap" -> "zypper";
+            case "alpine" -> "apk";
+            case "nixos" -> "nix";
+            case "void" -> "xbps";
+            case "gentoo" -> "emerge";
+            default -> null;
+        };
+    }
+
+    private static String readDistroFromConfig() {
+        try {
+            if (Files.exists(CONFIG_PATH)) {
+                String json = Files.readString(CONFIG_PATH);
+                JSONObject obj = new JSONObject(json);
+                return obj.optString("distro", "unknown");
+            }
+        } catch (Exception ignored) {}
+        return "unknown";
+    }
+
     private static String detectDistro() {
         try {
             List<String> lines = Files.readAllLines(Path.of("/etc/os-release"));

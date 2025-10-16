@@ -3,6 +3,7 @@ package flammable.bunny.ui;
 import flammable.bunny.core.*;
 
 import javax.swing.*;
+import java.awt.*;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -74,8 +75,9 @@ public class LingleUI extends JFrame {
         navPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(100, 100, 100)));
 
         JButton tmpfsNavButton = new JButton("auToMPFS");
+        JButton installerNavButton = new JButton("Installer");
         JButton settingsNavButton = new JButton("Utilities");
-        for (JButton btn : new JButton[]{tmpfsNavButton, settingsNavButton}) {
+        for (JButton btn : new JButton[]{tmpfsNavButton, installerNavButton, settingsNavButton}) {
             btn.setBackground(BTN_BG);
             btn.setForeground(TXT);
             btn.setBorder(new UIUtils.RoundedBorder(BTN_BORDER, 1, 8, false));
@@ -95,6 +97,7 @@ public class LingleUI extends JFrame {
             });
         }
         navPanel.add(settingsNavButton);
+        navPanel.add(installerNavButton);
         navPanel.add(tmpfsNavButton);
 
         // ===== Main content card =====
@@ -393,7 +396,7 @@ public class LingleUI extends JFrame {
         settingsPanel.setBackground(BG);
 
         settingsPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
-        JButton packagesButton = makeButton("Packages for Run Submission", 240);
+        JButton packagesButton = makeButton("Zip Packages for Run Submission", 240);
         packagesButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         settingsPanel.add(packagesButton);
         settingsPanel.add(Box.createVerticalGlue());
@@ -459,9 +462,66 @@ public class LingleUI extends JFrame {
         settingsPanel.add(packagesButton);
         settingsPanel.add(Box.createRigidArea(new Dimension(0, 15)));
 
+        // ===== Installer panel =====
+        JPanel installerPanel = new JPanel();
+        installerPanel.setLayout(new BoxLayout(installerPanel, BoxLayout.Y_AXIS));
+        installerPanel.setBackground(BG);
+        installerPanel.setBorder(BorderFactory.createEmptyBorder(15, 10, 15, 10));
+
+        JLabel installerTitle = new JLabel("Select packages to install:");
+        installerTitle.setForeground(TXT);
+        installerTitle.setFont(UI_FONT_BOLD);
+        installerTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        installerTitle.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
+        installerPanel.add(installerTitle);
+
+        String[] packages = {
+            "Waywall + GLFW",
+            "Prism Launcher",
+            "Ninjabrain Bot",
+            "ModCheck",
+            "Paceman Tracker",
+            "MapCheck",
+            "",
+            "",
+            "OBS Studio"
+        };
+
+        for (String pkg : packages) {
+            JCheckBox cb = createStyledCheckBox(pkg);
+            cb.setAlignmentX(Component.LEFT_ALIGNMENT);
+            cb.setBorder(BorderFactory.createEmptyBorder(5, 2, 5, 2));
+            installerPanel.add(cb);
+        }
+
+        installerPanel.add(Box.createVerticalStrut(20));
+
+        JButton installButton = makeButton("Install Selected", 180);
+        JPanel installRow = leftRow();
+        installRow.add(installButton);
+        installerPanel.add(installRow);
+
+        installerPanel.add(Box.createVerticalGlue());
+
+        installButton.addActionListener(e -> {
+            List<String> selected = new ArrayList<>();
+            for (Component c : installerPanel.getComponents()) {
+                if (c instanceof JCheckBox cb && cb.isSelected()) {
+                    selected.add(cb.getText());
+                }
+            }
+            if (selected.isEmpty()) {
+                showDarkMessage(this, "No Selection", "Please select at least one package to install.");
+                return;
+            }
+            PackageInstaller.installPackages(selected, this);
+        });
+
         contentPanel.add(settingsPanel, "Utilities");
+        contentPanel.add(installerPanel, "Installer");
         contentPanel.add(tmpfsPanel, "auToMPFS");
         settingsNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Utilities"));
+        installerNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Installer"));
         tmpfsNavButton.addActionListener(e -> cardLayout.show(contentPanel, "auToMPFS"));
         cardLayout.show(contentPanel, "Utilities");
 

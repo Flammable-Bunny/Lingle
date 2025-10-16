@@ -2,16 +2,11 @@ package flammable.bunny.core;
 
 import javax.swing.*;
 import java.io.*;
-import java.nio.file.*;
 import java.util.*;
-import org.json.JSONObject;
 
 import static flammable.bunny.ui.UIUtils.showDarkMessage;
 
 public class DependencyInstaller {
-
-    private static final Path CONFIG_PATH = Path.of(System.getProperty("user.home"))
-            .resolve(".local/share/lingle/config.json");
 
     public static boolean ensureDeps(JFrame parent) {
         List<String> missing = new ArrayList<>();
@@ -54,23 +49,7 @@ public class DependencyInstaller {
     }
 
     private static String detectPackageManager() {
-        String distro = readDistroFromConfig();
-        if (distro == null || distro.equals("unknown")) {
-            distro = detectDistroFallback();
-        }
-
-        // Match by known IDs
-        return switch (distro.toLowerCase()) {
-            case "arch", "endeavouros", "manjaro", "artix", "cachyos", "garuda" -> "pacman";
-            case "debian", "ubuntu", "mint", "pop", "pop!_os", "kali", "elementary", "zorin" -> "apt";
-            case "fedora", "rhel", "centos", "rocky", "almalinux" -> "dnf";
-            case "opensuse", "suse", "opensuse-tumbleweed", "opensuse-leap" -> "zypper";
-            case "alpine" -> "apk";
-            case "nixos" -> "nix";
-            case "void" -> "xbps";
-            case "gentoo" -> "emerge";
-            default -> detectDistroFallback();
-        };
+        return DistroDetector.getPackageManager();
     }
 
     private static void installPackages(String mgr, List<String> pkgs, JFrame parent)
@@ -99,29 +78,6 @@ public class DependencyInstaller {
                 .inheritIO()
                 .start()
                 .waitFor();
-    }
-
-    private static String readDistroFromConfig() {
-        try {
-            if (Files.exists(CONFIG_PATH)) {
-                String json = Files.readString(CONFIG_PATH);
-                JSONObject obj = new JSONObject(json);
-                return obj.optString("distro", "unknown");
-            }
-        } catch (Exception ignored) {}
-        return "unknown";
-    }
-
-    private static String detectDistroFallback() {
-        try {
-            List<String> lines = Files.readAllLines(Path.of("/etc/os-release"));
-            for (String line : lines) {
-                if (line.startsWith("ID=")) {
-                    return line.substring(3).replace("\"", "");
-                }
-            }
-        } catch (IOException ignored) {}
-        return "unknown";
     }
 
     private static boolean commandExists(String cmd) {
