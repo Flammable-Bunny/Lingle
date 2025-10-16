@@ -1,9 +1,6 @@
 package flammable.bunny.ui;
 
-import flammable.bunny.core.AdwManager;
-import flammable.bunny.core.LingleState;
-import flammable.bunny.core.LinkInstancesService;
-import flammable.bunny.core.Updater;
+import flammable.bunny.core.*;
 
 import javax.swing.*;
 import javax.swing.plaf.basic.BasicScrollBarUI;
@@ -77,7 +74,7 @@ public class LingleUI extends JFrame {
         navPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(100, 100, 100)));
 
         JButton tmpfsNavButton = new JButton("auToMPFS");
-        JButton settingsNavButton = new JButton(" ");
+        JButton settingsNavButton = new JButton("Utilities");
         for (JButton btn : new JButton[]{tmpfsNavButton, settingsNavButton}) {
             btn.setBackground(BTN_BG);
             btn.setForeground(TXT);
@@ -96,8 +93,8 @@ public class LingleUI extends JFrame {
                 }
             });
         }
-        navPanel.add(tmpfsNavButton);
         navPanel.add(settingsNavButton);
+        navPanel.add(tmpfsNavButton);
 
         // ===== Main content card =====
         CardLayout cardLayout = new CardLayout();
@@ -389,18 +386,83 @@ public class LingleUI extends JFrame {
 
         tmpfsPanel.add(alignWrapper, BorderLayout.CENTER);
 
-        // ===== Settings stub (unchanged) =====
-        JPanel settingsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        // ===== Utilities =====
+        JPanel settingsPanel = new JPanel();
+        settingsPanel.setLayout(new BoxLayout(settingsPanel, BoxLayout.Y_AXIS));
         settingsPanel.setBackground(BG);
-        JLabel empty = new JLabel("nothing here yet");
-        empty.setForeground(Color.LIGHT_GRAY);
-        empty.setFont(new Font("SansSerif", Font.ITALIC, 24));
-        settingsPanel.add(empty);
 
+        settingsPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
+        JButton packagesButton = makeButton("Packages for Run Submission", 240);
+        packagesButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        settingsPanel.add(packagesButton);
+        settingsPanel.add(Box.createVerticalGlue());
+
+        packagesButton.addActionListener(e -> {
+            if (!DependencyInstaller.ensureDeps(this)) return;
+
+            JFileChooser fc = new JFileChooser();
+            fc.setDialogTitle("Select output folder for SRC zip");
+            fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            fc.setApproveButtonText("Use this folder");
+            if (fc.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+
+            Path outDir = fc.getSelectedFile().toPath();
+
+
+            // progress dialog
+            JDialog progress = new JDialog(this, "Creating package", true);
+            JPanel pp = new JPanel(new BorderLayout());
+            pp.setBackground(BG);
+            JLabel lbl = new JLabel("Creating submission package…");
+            lbl.setForeground(TXT);
+            lbl.setFont(UI_FONT);
+            JProgressBar bar = new JProgressBar();
+            bar.setIndeterminate(true);
+            pp.add(lbl, BorderLayout.NORTH);
+            pp.add(bar, BorderLayout.CENTER);
+            pp.setBorder(BorderFactory.createEmptyBorder(10, 12, 12, 12));
+            progress.setContentPane(pp);
+            progress.pack();
+            progress.setLocationRelativeTo(this);
+            progress.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
+
+            Thread worker = new Thread(() -> {
+                int ec;
+                try {
+                    Path script = PackagesforRunSubmissionZipper.install(outDir);
+                    Process p = new ProcessBuilder("/bin/bash", script.toString(), outDir.toString())
+                            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                            .redirectError(ProcessBuilder.Redirect.DISCARD)
+                            .start();
+                    ec = p.waitFor();
+                } catch (Exception ex) {
+                    ec = 1;
+                }
+                final int exitCode = ec;
+                SwingUtilities.invokeLater(() -> {
+                    progress.dispose();
+                    if (exitCode == 0) {
+                        showDarkMessage(this, "Done", "Package created in:\n" + outDir);
+                    } else {
+                        showDarkMessage(this, "Error Code 14", "Packaging failed.");
+                    }
+                });
+            });
+
+            worker.start();
+            progress.setVisible(true);
+        });
+
+
+        settingsPanel.add(Box.createVerticalGlue());
+        settingsPanel.add(packagesButton);
+        settingsPanel.add(Box.createRigidArea(new Dimension(0, 15)));
+
+        contentPanel.add(settingsPanel, "Utilities");
         contentPanel.add(tmpfsPanel, "auToMPFS");
-        contentPanel.add(settingsPanel, " ");
+        settingsNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Utilities"));
         tmpfsNavButton.addActionListener(e -> cardLayout.show(contentPanel, "auToMPFS"));
-        settingsNavButton.addActionListener(e -> cardLayout.show(contentPanel, " "));
+        cardLayout.show(contentPanel, "Utilities");
 
         // ===== Frame =====
         JPanel navAndContent = new JPanel(new BorderLayout());

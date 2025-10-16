@@ -5,12 +5,18 @@ import flammable.bunny.ui.*;
 
 import javax.swing.*;
 import java.io.IOException;
+import com.formdev.flatlaf.FlatDarkLaf;
+import javax.swing.SwingUtilities;
+
 
 public class Main {
     public static void main(String[] args) {
+
+        FlatDarkLaf.setup();
+        DistroDetector.detectAndSaveDistro();
+
         boolean nogui = args.length > 0 && "--nogui".equals(args[0]);
 
-        // Validate environment
         if (!nogui && System.getenv("DISPLAY") == null && System.getenv("WAYLAND_DISPLAY") == null) {
             ErrorCodes.exit(ErrorCodes.MISUSE, "No DISPLAY/WAYLAND_DISPLAY found. This GUI requires a graphical session.");
         }
