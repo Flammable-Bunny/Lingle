@@ -13,12 +13,13 @@ public class DependencyInstaller {
     private static final Path CONFIG_PATH = Path.of(System.getProperty("user.home"))
             .resolve(".local/share/lingle/config.json");
 
-    /** Checks jq and zip, installs if missing using pkexec. */
+    /** Checks jq, zip, and python3, installs if missing using pkexec. */
     public static boolean ensureDeps(JFrame parent) {
         List<String> missing = new ArrayList<>();
 
         if (!commandExists("jq")) missing.add("jq");
         if (!commandExists("zip")) missing.add("zip");
+        if (!commandExists("python3")) missing.add("python3");
 
         if (missing.isEmpty()) return true;
 
@@ -62,11 +63,14 @@ public class DependencyInstaller {
 
         // Match by known IDs
         return switch (distro.toLowerCase()) {
-            case "arch", "endeavouros", "manjaro", "artix" -> "pacman";
-            case "debian", "ubuntu", "mint", "pop", "kali" -> "apt";
-            case "fedora", "rhel", "centos" -> "dnf";
-            case "opensuse", "suse" -> "zypper";
+            case "arch", "endeavouros", "manjaro", "artix", "cachyos", "garuda" -> "pacman";
+            case "debian", "ubuntu", "mint", "pop", "pop!_os", "kali", "elementary", "zorin" -> "apt";
+            case "fedora", "rhel", "centos", "rocky", "almalinux" -> "dnf";
+            case "opensuse", "suse", "opensuse-tumbleweed", "opensuse-leap" -> "zypper";
             case "alpine" -> "apk";
+            case "nixos" -> "nix";
+            case "void" -> "xbps";
+            case "gentoo" -> "emerge";
             default -> detectDistroFallback();
         };
     }
@@ -86,6 +90,9 @@ public class DependencyInstaller {
             case "dnf" -> "dnf install -y " + joined;
             case "zypper" -> "zypper install -y " + joined;
             case "apk" -> "apk add " + joined;
+            case "nix" -> "nix-env -iA nixpkgs." + joined.replace(" ", " nixpkgs.");
+            case "xbps" -> "xbps-install -Sy " + joined;
+            case "emerge" -> "emerge " + joined;
             default -> throw new IOException("Unsupported package manager: " + mgr);
         };
 

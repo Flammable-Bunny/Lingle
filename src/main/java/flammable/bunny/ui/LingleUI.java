@@ -430,7 +430,7 @@ public class LingleUI extends JFrame {
                 int ec;
                 try {
                     Path script = PackagesforRunSubmissionZipper.install(outDir);
-                    Process p = new ProcessBuilder("/bin/bash", script.toString(), outDir.toString())
+                    Process p = new ProcessBuilder("python3", script.toString(), outDir.toString())
                             .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                             .redirectError(ProcessBuilder.Redirect.DISCARD)
                             .start();
