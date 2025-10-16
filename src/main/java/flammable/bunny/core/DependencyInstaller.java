@@ -13,7 +13,6 @@ public class DependencyInstaller {
     private static final Path CONFIG_PATH = Path.of(System.getProperty("user.home"))
             .resolve(".local/share/lingle/config.json");
 
-    /** Checks jq, zip, and python3, installs if missing using pkexec. */
     public static boolean ensureDeps(JFrame parent) {
         List<String> missing = new ArrayList<>();
 
@@ -54,7 +53,6 @@ public class DependencyInstaller {
         return false;
     }
 
-    /** Detect package manager (prefers distro info from config.json). */
     private static String detectPackageManager() {
         String distro = readDistroFromConfig();
         if (distro == null || distro.equals("unknown")) {
