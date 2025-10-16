@@ -483,7 +483,7 @@ public class LingleUI extends JFrame {
             "Paceman Tracker",
             "MapCheck",
             "",
-            "",
+            "Discord",
             "OBS Studio"
         };
 

@@ -14,6 +14,7 @@ public final class DistroDetector {
 
     public static void detectAndSaveDistro() {
         String distro = detectDistro();
+        String gpu = detectGPU();
         try {
             Files.createDirectories(CONFIG_PATH.getParent());
             JSONObject cfg = new JSONObject();
@@ -23,6 +24,7 @@ public final class DistroDetector {
                 } catch (Exception ignored) {}
             }
             cfg.put("distro", distro);
+            cfg.put("gpu", gpu);
             try (BufferedWriter w = Files.newBufferedWriter(CONFIG_PATH)) {
                 w.write(cfg.toString(2));
             }
@@ -72,6 +74,38 @@ public final class DistroDetector {
                 }
             }
         } catch (IOException ignored) {}
+        return "unknown";
+    }
+
+    public static String getGPU() {
+        try {
+            if (Files.exists(CONFIG_PATH)) {
+                String json = Files.readString(CONFIG_PATH);
+                JSONObject obj = new JSONObject(json);
+                return obj.optString("gpu", "unknown");
+            }
+        } catch (Exception ignored) {}
+        return detectGPU();
+    }
+
+    private static String detectGPU() {
+        try {
+            Process p = new ProcessBuilder("lspci").start();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String lowerLine = line.toLowerCase();
+                if (lowerLine.contains("vga") || lowerLine.contains("3d") || lowerLine.contains("display")) {
+                    if (lowerLine.contains("nvidia")) {
+                        return "nvidia";
+                    } else if (lowerLine.contains("amd") || lowerLine.contains("radeon")) {
+                        return "amd";
+                    } else if (lowerLine.contains("intel")) {
+                        return "intel";
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
         return "unknown";
     }
 }

@@ -27,6 +27,9 @@ public class PackageInstaller {
     private static final int ERR_BUILD_SCRIPT_FAILED = 2005;
     private static final int ERR_WAYWALL_CLONE_FAILED = 2006;
     private static final int ERR_WAYWALL_BUILD_FAILED = 2007;
+    private static final int ERR_PRISM_CONFIG_FAILED = 3001;
+    private static final int ERR_DISCORD_DOWNLOAD_FAILED = 4001;
+    private static final int ERR_DISCORD_INSTALL_FAILED = 4002;
     private static final int ERR_GENERAL_SETUP = 2999;
 
     private static final Map<String, Map<String, String>> PACKAGE_MAPPINGS = new HashMap<>();
@@ -55,6 +58,24 @@ public class PackageInstaller {
         go.put("apt", "golang");
         go.put("dnf", "golang");
         PACKAGE_MAPPINGS.put("Go", go);
+
+        Map<String, String> prism = new HashMap<>();
+        prism.put("pacman", "prismlauncher jdk17-openjdk");
+        prism.put("apt", "prismlauncher openjdk-17-jdk");
+        prism.put("dnf", ""); // Special handling for Fedora COPR
+        PACKAGE_MAPPINGS.put("Prism Launcher", prism);
+
+        Map<String, String> obs = new HashMap<>();
+        obs.put("pacman", "obs-studio");
+        obs.put("apt", "obs-studio");
+        obs.put("dnf", "obs-studio");
+        PACKAGE_MAPPINGS.put("OBS Studio", obs);
+
+        Map<String, String> discord = new HashMap<>();
+        discord.put("pacman", "discord");
+        discord.put("apt", "discord");
+        discord.put("dnf", "discord");
+        PACKAGE_MAPPINGS.put("Discord", discord);
     }
 
     public static void installPackages(List<String> packageNames, JFrame parent) {
@@ -67,6 +88,8 @@ public class PackageInstaller {
 
             List<String> toInstall = new ArrayList<>();
             boolean isWaywallGLFW = false;
+            boolean isPrismLauncher = false;
+            boolean isDiscord = false;
 
             for (String pkgName : packageNames) {
                 if (pkgName.equals("Waywall + GLFW")) {
@@ -80,10 +103,38 @@ public class PackageInstaller {
                         return;
                     }
                     isWaywallGLFW = true;
+
+                    // Install Fedora-specific dependencies first if needed
+                    if ("dnf".equals(pkgManager)) {
+                        try {
+                            FedoraInstaller.installWaywallDependencies();
+                        } catch (Exception e) {
+                            showDarkMessage(parent, "Error", formatError(ERR_INSTALL_FAILED, "Failed to install Fedora dependencies:\n" + e.getMessage()));
+                            return;
+                        }
+                    }
+
                     addPackageIfAvailable("Git", pkgManager, toInstall);
                     addPackageIfAvailable("Podman", pkgManager, toInstall);
                     addPackageIfAvailable("Docker", pkgManager, toInstall);
                     addPackageIfAvailable("Go", pkgManager, toInstall);
+                } else if (pkgName.equals("Prism Launcher")) {
+                    isPrismLauncher = true;
+
+                    // Use COPR for Fedora
+                    if ("dnf".equals(pkgManager)) {
+                        try {
+                            FedoraInstaller.installPrismLauncher();
+                        } catch (Exception e) {
+                            showDarkMessage(parent, "Error", formatError(ERR_INSTALL_FAILED, "Failed to install Prism Launcher:\n" + e.getMessage()));
+                            return;
+                        }
+                    } else {
+                        addPackageIfAvailable("Prism Launcher", pkgManager, toInstall);
+                    }
+                } else if (pkgName.equals("Discord")) {
+                    isDiscord = true;
+                    addPackageIfAvailable("Discord", pkgManager, toInstall);
                 } else {
                     addPackageIfAvailable(pkgName, pkgManager, toInstall);
                 }
@@ -96,8 +147,21 @@ public class PackageInstaller {
 
             executeInstall(pkgManager, toInstall, parent);
 
+            // Handle Discord app.asar replacement after Discord is installed
+            if (isDiscord) {
+                try {
+                    DiscordInstaller.installCustomAppAsar(pkgManager);
+                    showDarkMessage(parent, "Done", "Discord installed and configured with OpenAsar successfully!");
+                } catch (Exception e) {
+                    showDarkMessage(parent, "Warning", formatError(ERR_DISCORD_INSTALL_FAILED, "Discord installed but app.asar replacement failed:\n" + e.getMessage()));
+                }
+                return;
+            }
+
             if (isWaywallGLFW) {
                 setupWaywallGLFW(parent);
+            } else if (isPrismLauncher) {
+                configurePrismLauncher(pkgManager, parent);
             } else {
                 showDarkMessage(parent, "Done", "Packages installed successfully.");
             }
@@ -307,8 +371,7 @@ public class PackageInstaller {
                         deleteDirectory(waywallDir);
                     }
 
-                    ProcessBuilder gitClone = new ProcessBuilder("git", "clone", "https://github.com/ByPaco10/waywall", waywallDir.toString());
-                    // ProcessBuilder gitClone = new ProcessBuilder("git", "clone", "https://github.com/tesselslate/waywall", waywallDir.toString());
+                    ProcessBuilder gitClone = new ProcessBuilder("git", "clone", "https://github.com/tesselslate/waywall", waywallDir.toString());
                     gitClone.inheritIO();
                     int cloneExitCode = gitClone.start().waitFor();
 
@@ -468,6 +531,67 @@ public class PackageInstaller {
                         java.nio.file.Files.delete(p);
                     } catch (IOException ignored) {}
                 });
+        }
+    }
+
+    private static void configurePrismLauncher(String pkgManager, JFrame parent) {
+        try {
+            String home = System.getProperty("user.home");
+            Path configFile = Path.of(home, ".local/share/PrismLauncher/prismlauncher.cfg");
+
+            // Create directory if it doesn't exist
+            Files.createDirectories(configFile.getParent());
+
+            // Determine Java path based on distro
+            String javaPath;
+            if ("dnf".equals(pkgManager)) {
+                javaPath = "/usr/lib/jvm/java-21-openjdk/bin/java";
+            } else {
+                javaPath = "/usr/lib/jvm/java-17-openjdk/bin/java";
+            }
+
+            // Read existing config or create new
+            List<String> lines = new ArrayList<>();
+            if (Files.exists(configFile)) {
+                lines = Files.readAllLines(configFile);
+            }
+
+            // Settings to set/update
+            Map<String, String> settings = new HashMap<>();
+            settings.put("IgnoreJavaCompatibility", "true");
+            settings.put("AutomaticJavaDownload", "false");
+            settings.put("JavaDir", "java");
+            settings.put("JavaPath", javaPath);
+            settings.put("WrapperCommand", "waywall wrap --");
+            settings.put("CustomGLFWPath", "/usr/local/lib64/waywall-glfw/libglfw.so");
+            settings.put("UseNativeGLFW", "true");
+
+            // Update or add settings
+            for (Map.Entry<String, String> setting : settings.entrySet()) {
+                String key = setting.getKey();
+                String value = setting.getValue();
+                boolean found = false;
+
+                for (int i = 0; i < lines.size(); i++) {
+                    String line = lines.get(i);
+                    if (line.startsWith(key + "=")) {
+                        lines.set(i, key + "=" + value);
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    lines.add(key + "=" + value);
+                }
+            }
+
+            Files.write(configFile, lines);
+
+            showDarkMessage(parent, "Done", "Prism Launcher installed and configured successfully!");
+
+        } catch (Exception e) {
+            showDarkMessage(parent, "Error", formatError(ERR_PRISM_CONFIG_FAILED, "Failed to configure Prism Launcher:\n" + e.getMessage()));
         }
     }
 
