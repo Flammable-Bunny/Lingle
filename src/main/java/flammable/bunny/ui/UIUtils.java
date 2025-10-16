@@ -3,7 +3,6 @@ package flammable.bunny.ui;
 import java.awt.*;
 import java.util.function.BooleanSupplier;
 import javax.swing.*;
-import javax.swing.border.Border;
 
 import static flammable.bunny.ui.UIConstants.*;
 
@@ -55,7 +54,6 @@ public class UIUtils {
         cb.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
         cb.setIconTextGap(6);
 
-        // Use custom checkbox icon for modern look
         cb.setUI(new javax.swing.plaf.basic.BasicCheckBoxUI() {
             @Override
             public Icon getDefaultIcon() {
@@ -69,16 +67,13 @@ public class UIUtils {
                         boolean selected = checkbox.isSelected();
                         boolean hovered = checkbox.getModel().isRollover();
 
-                        // Draw checkbox background with rounded corners
                         g2.setColor(selected ? new Color(75, 95, 140) : new Color(50, 50, 50));
                         g2.fillRoundRect(x, y, 16, 16, 4, 4);
 
-                        // Draw border
                         g2.setColor(hovered ? new Color(100, 150, 200) : new Color(100, 100, 100));
                         g2.setStroke(new BasicStroke(1.5f));
                         g2.drawRoundRect(x, y, 16, 16, 4, 4);
 
-                        // Draw checkmark if selected
                         if (selected) {
                             g2.setColor(Color.WHITE);
                             g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
@@ -143,5 +138,61 @@ public class UIUtils {
         d.setMinimumSize(new Dimension(520, 180));
         d.setLocationRelativeTo(parent);
         d.setVisible(true);
+    }
+
+    public static boolean showDarkConfirm(Window parent, String title, String message) {
+        Window owner = parent != null ? SwingUtilities.getWindowAncestor(parent) : null;
+        JDialog d = new JDialog(owner, title, Dialog.ModalityType.APPLICATION_MODAL);
+        d.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        d.setResizable(false);
+
+        final boolean[] result = {false};
+
+        JPanel root = new JPanel(new BorderLayout(14, 14));
+        root.setBackground(BG);
+        root.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(100, 100, 100), 1),
+                BorderFactory.createEmptyBorder(18, 18, 18, 18)
+        ));
+
+        JLabel header = new JLabel(title);
+        header.setForeground(TXT);
+        header.setFont(new Font("SansSerif", Font.BOLD, 16));
+        root.add(header, BorderLayout.NORTH);
+
+        JTextArea ta = new JTextArea(message);
+        ta.setEditable(false);
+        ta.setWrapStyleWord(true);
+        ta.setLineWrap(true);
+        ta.setOpaque(false);
+        ta.setForeground(TXT);
+        ta.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        ta.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+        root.add(ta, BorderLayout.CENTER);
+
+        JButton yes = new JButton("Yes");
+        JButton no = new JButton("No");
+        styleWithHover(yes);
+        styleWithHover(no);
+
+        yes.addActionListener(e -> {
+            result[0] = true;
+            d.dispose();
+        });
+        no.addActionListener(e -> d.dispose());
+
+        JPanel btns = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btns.setBackground(BG);
+        btns.add(no);
+        btns.add(yes);
+        root.add(btns, BorderLayout.SOUTH);
+
+        d.setContentPane(root);
+        d.pack();
+        d.setMinimumSize(new Dimension(520, 180));
+        d.setLocationRelativeTo(parent);
+        d.setVisible(true);
+
+        return result[0];
     }
 }

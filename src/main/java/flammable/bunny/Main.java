@@ -9,19 +9,56 @@ import java.io.IOException;
 public class Main {
     public static void main(String[] args) {
         boolean nogui = args.length > 0 && "--nogui".equals(args[0]);
+
+        // Validate environment
+        if (!nogui && System.getenv("DISPLAY") == null && System.getenv("WAYLAND_DISPLAY") == null) {
+            ErrorCodes.exit(ErrorCodes.MISUSE, "No DISPLAY/WAYLAND_DISPLAY found. This GUI requires a graphical session.");
+        }
+
         try {
             TmpfsScriptManager.ensureScriptsPresent();
-            LingleState.loadState();
-            LinkInstancesService.preparePracticeMapLinks();
-            Updater.checkForUpdates();
-            AdwManager.startAdwIfNeeded();
         } catch (IOException e) {
+            String msg = "Failed to create scripts: " + e.getMessage();
             if (nogui) {
-                e.printStackTrace(System.err);
+                ErrorCodes.exit(ErrorCodes.IO_ERROR, msg);
             } else {
-                UIUtils.showDarkMessage(null, "Lingle", "Initial Error: " + e.getMessage());
+                ErrorCodes.exitWithDialog(null, ErrorCodes.IO_ERROR, "Initialization Error", msg);
             }
-            System.exit(1);
+        }
+
+        try {
+            LingleState.loadState();
+        } catch (IOException e) {
+            String msg = "Failed to load configuration: " + e.getMessage();
+            if (nogui) {
+                ErrorCodes.exit(ErrorCodes.CONFIG_ERROR, msg);
+            } else {
+                ErrorCodes.exitWithDialog(null, ErrorCodes.CONFIG_ERROR, "Configuration Error", msg);
+            }
+        }
+
+        try {
+            LinkInstancesService.preparePracticeMapLinks();
+        } catch (IOException e) {
+            String msg = "Failed to prepare practice map links: " + e.getMessage();
+            if (!nogui) {
+                ErrorCodes.showError(null, ErrorCodes.SYMLINK_ERROR, msg);
+            } else {
+                System.err.println("[WARNING] " + msg);
+            }
+        }
+
+        Updater.checkForUpdates();
+
+        try {
+            AdwManager.startAdwIfNeeded();
+        } catch (Exception e) {
+            String msg = "Failed to start ADW service: " + e.getMessage();
+            if (!nogui) {
+                ErrorCodes.showError(null, ErrorCodes.ADW_ERROR, msg);
+            } else {
+                System.err.println("[WARNING] " + msg);
+            }
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread(AdwManager::stopAdwQuietly));
@@ -32,11 +69,6 @@ public class Main {
                 Thread.currentThread().join();
             } catch (InterruptedException ignored) {}
             return;
-        }
-
-        if (System.getenv("DISPLAY") == null && System.getenv("WAYLAND_DISPLAY") == null) {
-            System.err.println("No DISPLAY/WAYLAND_DISPLAY found. This GUI requires a graphical session.");
-            System.exit(1);
         }
 
         System.setProperty("awt.useSystemAAFontSettings", "on");

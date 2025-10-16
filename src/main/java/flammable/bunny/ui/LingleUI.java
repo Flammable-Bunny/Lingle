@@ -71,7 +71,7 @@ public class LingleUI extends JFrame {
             }
         });
 
-        // ===== Nav bar (unchanged) =====
+        // ===== Nav bar =====
         JPanel navPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
         navPanel.setBackground(BG);
         navPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(100, 100, 100)));
@@ -223,7 +223,6 @@ public class LingleUI extends JFrame {
 
                 String raw = dir.getFileName().toString();
 
-                // If name starts with "_" rename once to drop the underscore
                 if (raw.startsWith("_")) {
                     Path to = dir.getParent().resolve(raw.substring(1));
                     if (!Files.exists(to)) {
@@ -234,7 +233,6 @@ public class LingleUI extends JFrame {
                     }
                 }
 
-                // Hide "Z_" visually (don’t rename on disk)
                 String display = raw.startsWith("Z_") ? raw.substring(2) : raw;
 
                 JCheckBox cb = createStyledCheckBox(display);
@@ -336,7 +334,6 @@ public class LingleUI extends JFrame {
             List<String> chosen = new ArrayList<>();
             for (Component c : savesChecks.getComponents()) {
                 if (c instanceof JCheckBox cb && cb.isSelected()) {
-                    // We display without "Z_". Persist the label as shown.
                     chosen.add(cb.getText());
                 }
             }

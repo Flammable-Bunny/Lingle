@@ -40,6 +40,20 @@ tasks.shadowJar {
     archiveClassifier.set("")
 }
 
+// Fix task dependency warnings
+tasks.named("distZip") {
+    dependsOn(tasks.shadowJar)
+}
+tasks.named("distTar") {
+    dependsOn(tasks.shadowJar)
+}
+tasks.named("startScripts") {
+    dependsOn(tasks.shadowJar)
+}
+tasks.named("startShadowScripts") {
+    dependsOn(tasks.jar)
+}
+
 sourceSets {
     named("main") {
         java.srcDirs("src/main/java")
