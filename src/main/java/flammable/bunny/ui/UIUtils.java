@@ -185,10 +185,11 @@ public class UIUtils {
     }
 
     public static void showDarkMessage(Window parent, String title, String message) {
-        Window owner = parent != null ? SwingUtilities.getWindowAncestor(parent) : null;
+        Window owner = parent != null ? (parent instanceof Window ? parent : SwingUtilities.getWindowAncestor(parent)) : null;
         JDialog d = new JDialog(owner, title, Dialog.ModalityType.APPLICATION_MODAL);
         d.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-        d.setResizable(false);
+        d.setResizable(true);
+        d.setAlwaysOnTop(true);
 
         JPanel root = new JPanel(new BorderLayout(14, 14));
         root.setBackground(BG);
@@ -210,7 +211,14 @@ public class UIUtils {
         ta.setForeground(TXT);
         ta.setFont(new Font("SansSerif", Font.PLAIN, 14));
         ta.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
-        root.add(ta, BorderLayout.CENTER);
+
+        // Add scroll pane for long messages
+        JScrollPane scrollPane = new JScrollPane(ta);
+        scrollPane.setOpaque(false);
+        scrollPane.getViewport().setOpaque(false);
+        scrollPane.setBorder(null);
+        scrollPane.setPreferredSize(new Dimension(500, Math.min(400, ta.getPreferredSize().height + 20)));
+        root.add(scrollPane, BorderLayout.CENTER);
 
         JButton ok = new JButton("OK");
         styleWithHover(ok);
@@ -224,15 +232,17 @@ public class UIUtils {
         d.setContentPane(root);
         d.pack();
         d.setMinimumSize(new Dimension(520, 180));
+        d.setMaximumSize(new Dimension(700, 600));
         d.setLocationRelativeTo(parent);
         d.setVisible(true);
     }
 
     public static boolean showDarkConfirm(Window parent, String title, String message) {
-        Window owner = parent != null ? SwingUtilities.getWindowAncestor(parent) : null;
+        Window owner = parent != null ? (parent instanceof Window ? parent : SwingUtilities.getWindowAncestor(parent)) : null;
         JDialog d = new JDialog(owner, title, Dialog.ModalityType.APPLICATION_MODAL);
         d.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         d.setResizable(false);
+        d.setAlwaysOnTop(true);
 
         final boolean[] result = {false};
 

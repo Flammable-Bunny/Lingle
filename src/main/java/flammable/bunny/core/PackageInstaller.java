@@ -1,12 +1,33 @@
 package flammable.bunny.core;
 
 import javax.swing.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
 import java.io.*;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static flammable.bunny.ui.UIUtils.showDarkMessage;
 
 public class PackageInstaller {
+
+    // Error codes for Waywall + GLFW installation
+    private static final int ERR_PKG_MGR_NOT_DETECTED = 1001;
+    private static final int ERR_UNSUPPORTED_DISTRO = 1002;
+    private static final int ERR_INSTALL_FAILED = 1003;
+    private static final int ERR_PACUR_INSTALL_FAILED = 2001;
+    private static final int ERR_PACUR_DIR_NOT_FOUND = 2002;
+    private static final int ERR_PACUR_VERSION_NOT_FOUND = 2003;
+    private static final int ERR_UPDATE_SCRIPT_FAILED = 2004;
+    private static final int ERR_BUILD_SCRIPT_FAILED = 2005;
+    private static final int ERR_WAYWALL_CLONE_FAILED = 2006;
+    private static final int ERR_WAYWALL_BUILD_FAILED = 2007;
+    private static final int ERR_GENERAL_SETUP = 2999;
 
     private static final Map<String, Map<String, String>> PACKAGE_MAPPINGS = new HashMap<>();
 
@@ -40,7 +61,7 @@ public class PackageInstaller {
         try {
             String pkgManager = detectPackageManager();
             if (pkgManager == null) {
-                showDarkMessage(parent, "Error", "Could not detect package manager.");
+                showDarkMessage(parent, "Error", formatError(ERR_PKG_MGR_NOT_DETECTED, "Could not detect package manager."));
                 return;
             }
 
@@ -51,10 +72,11 @@ public class PackageInstaller {
                 if (pkgName.equals("Waywall + GLFW")) {
                     if (!isSupportedDistro(pkgManager)) {
                         showDarkMessage(parent, "Unsupported Distro",
-                            "Automatic Waywall + GLFW installation is only supported on:\n" +
-                            "- Arch Linux (and derivatives)\n" +
-                            "- Fedora (and derivatives)\n" +
-                            "- Debian (and derivatives including Ubuntu)");
+                            formatError(ERR_UNSUPPORTED_DISTRO,
+                                "Automatic Waywall + GLFW installation is only supported on:\n" +
+                                "- Arch Linux (and derivatives)\n" +
+                                "- Fedora (and derivatives)\n" +
+                                "- Debian (and derivatives including Ubuntu)"));
                         return;
                     }
                     isWaywallGLFW = true;
@@ -81,7 +103,7 @@ public class PackageInstaller {
             }
 
         } catch (Exception e) {
-            showDarkMessage(parent, "Error", "Failed to install packages:\n" + e.getMessage());
+            showDarkMessage(parent, "Error", formatError(ERR_INSTALL_FAILED, "Failed to install packages:\n" + e.getMessage()));
         }
     }
 
@@ -104,10 +126,6 @@ public class PackageInstaller {
             throws IOException, InterruptedException {
 
         String joined = String.join(" ", pkgs);
-        List<String> cmd = new ArrayList<>();
-        cmd.add("pkexec");
-        cmd.add("bash");
-        cmd.add("-c");
 
         String installCmd = switch (mgr) {
             case "pacman" -> "pacman -S --noconfirm " + joined;
@@ -121,93 +139,313 @@ public class PackageInstaller {
             default -> throw new IOException("Unsupported package manager: " + mgr);
         };
 
-        cmd.add(installCmd);
-        new ProcessBuilder(cmd)
-                .inheritIO()
-                .start()
-                .waitFor();
+        ProcessBuilder pb = new ProcessBuilder("sudo", "bash", "-c", installCmd);
+        pb.inheritIO().start().waitFor();
     }
 
     private static void setupWaywallGLFW(JFrame parent) {
+        JDialog progressDialog = null;
         try {
-            showDarkMessage(parent, "Setup", "Installing pacur and configuring Docker images...\nThis may take several minutes.");
-
             String home = System.getProperty("user.home");
 
-            ProcessBuilder goInstall = new ProcessBuilder("bash", "-c",
-                "export PATH=$PATH:$HOME/go/bin && go install github.com/pacur/pacur@latest");
-            goInstall.inheritIO();
-            int exitCode = goInstall.start().waitFor();
+            // Create progress dialog with progress bar
+            progressDialog = new JDialog(parent, "Waywall + GLFW Setup", true);
+            JPanel panel = new JPanel(new BorderLayout(10, 10));
+            panel.setBackground(new Color(43, 43, 43));
+            panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-            if (exitCode != 0) {
-                showDarkMessage(parent, "Error", "Failed to install pacur via go install");
-                return;
-            }
+            JProgressBar progressBar = new JProgressBar(0, 7);
+            progressBar.setStringPainted(true);
+            progressBar.setString("Installing dependencies");
+            progressBar.setForeground(new Color(106, 153, 85));
+            progressBar.setBackground(new Color(60, 63, 65));
 
-            java.nio.file.Path pacurBase = java.nio.file.Path.of(home, "go", "pkg", "mod", "github.com", "pacur");
-            if (!java.nio.file.Files.exists(pacurBase)) {
-                showDarkMessage(parent, "Error", "Pacur directory not found at: " + pacurBase);
-                return;
-            }
+            panel.add(progressBar, BorderLayout.CENTER);
+            progressDialog.add(panel);
+            progressDialog.setSize(400, 100);
+            progressDialog.setLocationRelativeTo(parent);
+            progressDialog.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
 
-            java.nio.file.Path pacurDir = java.nio.file.Files.list(pacurBase)
-                .filter(p -> p.getFileName().toString().startsWith("pacur@"))
-                .findFirst()
-                .orElse(null);
+            JDialog finalProgressDialog = progressDialog;
 
-            if (pacurDir == null) {
-                showDarkMessage(parent, "Error", "Could not find pacur version directory");
-                return;
-            }
+            // Run installation in a separate thread
+            Thread installThread = new Thread(() -> {
+                try {
+                    // Step 1: Installing dependencies (already done by previous steps)
+                    SwingUtilities.invokeLater(() -> {
+                        progressBar.setValue(1);
+                        progressBar.setString("Downloading pacur");
+                    });
 
-            java.nio.file.Path dockerDir = pacurDir.resolve("docker");
+                    ProcessBuilder goInstall = new ProcessBuilder("bash", "-c",
+                        "export PATH=$PATH:$HOME/go/bin && go install github.com/pacur/pacur@latest");
+                    goInstall.inheritIO();
+                    int exitCode = goInstall.start().waitFor();
 
-            // Remove all directories except archlinux, fedora-42, and debian-trixie
-            List<String> dirsToRemove = new ArrayList<>();
-            java.nio.file.Files.list(dockerDir)
-                .filter(java.nio.file.Files::isDirectory)
-                .filter(p -> {
-                    String name = p.getFileName().toString();
-                    return !name.equals("archlinux") && !name.equals("fedora-42") && !name.equals("debian-trixie");
-                })
-                .forEach(p -> dirsToRemove.add(p.toString()));
+                    if (exitCode != 0) {
+                        SwingUtilities.invokeLater(() -> {
+                            finalProgressDialog.dispose();
+                            showDarkMessage(parent, "Error", formatError(ERR_PACUR_INSTALL_FAILED, "Failed to install pacur via go install"));
+                        });
+                        return;
+                    }
 
-            if (!dirsToRemove.isEmpty()) {
-                String rmCmd = "rm -rf " + String.join(" ", dirsToRemove);
-                ProcessBuilder rmProcess = new ProcessBuilder("pkexec", "bash", "-c", rmCmd);
-                rmProcess.inheritIO();
-                int rmExitCode = rmProcess.start().waitFor();
+                    java.nio.file.Path pacurBase = java.nio.file.Path.of(home, "go", "pkg", "mod", "github.com", "pacur");
+                    if (!java.nio.file.Files.exists(pacurBase)) {
+                        SwingUtilities.invokeLater(() -> {
+                            finalProgressDialog.dispose();
+                            showDarkMessage(parent, "Error", formatError(ERR_PACUR_DIR_NOT_FOUND, "Pacur directory not found at: " + pacurBase));
+                        });
+                        return;
+                    }
 
-                if (rmExitCode != 0) {
-                    showDarkMessage(parent, "Warning", "Failed to remove some Docker directories");
+                    java.nio.file.Path pacurDir = java.nio.file.Files.list(pacurBase)
+                        .filter(p -> p.getFileName().toString().startsWith("pacur@"))
+                        .findFirst()
+                        .orElse(null);
+
+                    if (pacurDir == null) {
+                        SwingUtilities.invokeLater(() -> {
+                            finalProgressDialog.dispose();
+                            showDarkMessage(parent, "Error", formatError(ERR_PACUR_VERSION_NOT_FOUND, "Could not find pacur version directory"));
+                        });
+                        return;
+                    }
+
+                    // Step 2: Deleting unnecessary files and updating scripts
+                    SwingUtilities.invokeLater(() -> {
+                        progressBar.setValue(2);
+                        progressBar.setString("Preparing pacur environment");
+                    });
+
+                    java.nio.file.Path dockerDir = pacurDir.resolve("docker");
+
+                    // Build list of directories to remove
+                    StringBuilder dirsToRemove = new StringBuilder();
+                    java.nio.file.Files.list(dockerDir)
+                        .filter(java.nio.file.Files::isDirectory)
+                        .filter(p -> {
+                            String name = p.getFileName().toString();
+                            return !name.equals("archlinux") && !name.equals("fedora-42") && !name.equals("debian-trixie");
+                        })
+                        .forEach(p -> {
+                            if (dirsToRemove.length() > 0) dirsToRemove.append(" ");
+                            dirsToRemove.append("'").append(p.toString()).append("'");
+                        });
+
+                    // Use sudo for root operations - sudo caches credentials for subsequent calls
+                    String combinedCmd;
+                    if (dirsToRemove.length() > 0) {
+                        combinedCmd = String.format(
+                            "rm -rf %s && cd '%s' && sed -i 's/su podman/podman/g; s/sudo podman/podman/g; s/sudo docker/docker/g' update.sh build.sh",
+                            dirsToRemove.toString(),
+                            dockerDir.toString()
+                        );
+                    } else {
+                        combinedCmd = String.format(
+                            "cd '%s' && sed -i 's/su podman/podman/g; s/sudo podman/podman/g; s/sudo docker/docker/g' update.sh build.sh",
+                            dockerDir.toString()
+                        );
+                    }
+
+                    ProcessBuilder combinedProcess = new ProcessBuilder("sudo", "bash", "-c", combinedCmd);
+                    combinedProcess.inheritIO();
+                    int combinedExitCode = combinedProcess.start().waitFor();
+
+                    if (combinedExitCode != 0) {
+                        SwingUtilities.invokeLater(() -> {
+                            finalProgressDialog.dispose();
+                            showDarkMessage(parent, "Error", formatError(ERR_UPDATE_SCRIPT_FAILED, "Failed to prepare pacur environment"));
+                        });
+                        return;
+                    }
+
+                    // Step 3: Running update and build scripts
+                    SwingUtilities.invokeLater(() -> {
+                        progressBar.setValue(3);
+                        progressBar.setString("Building pacur containers");
+                    });
+
+                    ProcessBuilder updateSh = new ProcessBuilder("bash", dockerDir.resolve("update.sh").toString());
+                    updateSh.directory(dockerDir.toFile());
+                    updateSh.inheritIO();
+                    int updateExitCode = updateSh.start().waitFor();
+
+                    if (updateExitCode != 0) {
+                        final int finalUpdateExitCode = updateExitCode;
+                        SwingUtilities.invokeLater(() -> {
+                            finalProgressDialog.dispose();
+                            showDarkMessage(parent, "Error", formatError(ERR_UPDATE_SCRIPT_FAILED, "update.sh failed with exit code: " + finalUpdateExitCode));
+                        });
+                        return;
+                    }
+
+                    ProcessBuilder buildSh = new ProcessBuilder("bash", dockerDir.resolve("build.sh").toString());
+                    buildSh.directory(dockerDir.toFile());
+                    buildSh.inheritIO();
+                    int buildExitCode = buildSh.start().waitFor();
+
+                    if (buildExitCode != 0) {
+                        final int finalBuildExitCode = buildExitCode;
+                        SwingUtilities.invokeLater(() -> {
+                            finalProgressDialog.dispose();
+                            showDarkMessage(parent, "Error", formatError(ERR_BUILD_SCRIPT_FAILED, "build.sh failed with exit code: " + finalBuildExitCode));
+                        });
+                        return;
+                    }
+
+                    // Step 4: Cloning waywall
+                    SwingUtilities.invokeLater(() -> {
+                        progressBar.setValue(4);
+                        progressBar.setString("Cloning waywall");
+                    });
+
+                    java.nio.file.Path waywallDir = java.nio.file.Path.of(home, "waywall");
+
+                    // Remove existing waywall directory if it exists
+                    if (java.nio.file.Files.exists(waywallDir)) {
+                        deleteDirectory(waywallDir);
+                    }
+
+                    ProcessBuilder gitClone = new ProcessBuilder("git", "clone", "https://github.com/ByPaco10/waywall", waywallDir.toString());
+                    // ProcessBuilder gitClone = new ProcessBuilder("git", "clone", "https://github.com/tesselslate/waywall", waywallDir.toString());
+                    gitClone.inheritIO();
+                    int cloneExitCode = gitClone.start().waitFor();
+
+                    if (cloneExitCode != 0) {
+                        SwingUtilities.invokeLater(() -> {
+                            finalProgressDialog.dispose();
+                            showDarkMessage(parent, "Error", formatError(ERR_WAYWALL_CLONE_FAILED, "Failed to clone waywall repository"));
+                        });
+                        return;
+                    }
+
+                    // Step 5: Running installation script
+                    SwingUtilities.invokeLater(() -> {
+                        progressBar.setValue(5);
+                        progressBar.setString("Running installation script");
+                    });
+
+                    java.nio.file.Path buildPackagesScript = waywallDir.resolve("build-packages.sh");
+                    if (!java.nio.file.Files.exists(buildPackagesScript)) {
+                        SwingUtilities.invokeLater(() -> {
+                            finalProgressDialog.dispose();
+                            showDarkMessage(parent, "Error", formatError(ERR_WAYWALL_BUILD_FAILED, "build-packages.sh not found at: " + buildPackagesScript));
+                        });
+                        return;
+                    }
+
+                    // Determine distro family flag
+                    String pkgManager = detectPackageManager();
+                    String distroFlag;
+                    if (pkgManager != null) {
+                        distroFlag = switch (pkgManager) {
+                            case "pacman" -> "--arch";
+                            case "dnf" -> "--fedora";
+                            case "apt" -> "--debian";
+                            default -> null;
+                        };
+                    } else {
+                        distroFlag = null;
+                    }
+
+                    ProcessBuilder buildPackages;
+                    if (distroFlag != null) {
+                        buildPackages = new ProcessBuilder("bash", buildPackagesScript.toString(), distroFlag);
+                    } else {
+                        buildPackages = new ProcessBuilder("bash", buildPackagesScript.toString());
+                    }
+                    buildPackages.directory(waywallDir.toFile());
+                    buildPackages.inheritIO();
+                    int buildPackagesExitCode = buildPackages.start().waitFor();
+
+                    if (buildPackagesExitCode != 0) {
+                        final int finalBuildPackagesExitCode = buildPackagesExitCode;
+                        SwingUtilities.invokeLater(() -> {
+                            finalProgressDialog.dispose();
+                            showDarkMessage(parent, "Error", formatError(ERR_WAYWALL_BUILD_FAILED, "build-packages.sh failed with exit code: " + finalBuildPackagesExitCode));
+                        });
+                        return;
+                    }
+
+                    // Step 6: Installing waywall and GLFW
+                    SwingUtilities.invokeLater(() -> {
+                        progressBar.setValue(6);
+                        progressBar.setString("Installing waywall and GLFW");
+                    });
+
+                    // Determine the package file to install
+                    java.nio.file.Path buildDir = waywallDir.resolve("waywall-build");
+                    String installPackageCmd = null;
+
+                    if (pkgManager != null) {
+                        switch (pkgManager) {
+                            case "pacman" -> {
+                                java.nio.file.Path pkgFile = buildDir.resolve("waywall-0.5-1-x86_64.pkg.tar.zst");
+                                if (java.nio.file.Files.exists(pkgFile)) {
+                                    installPackageCmd = "pacman -U --noconfirm " + pkgFile.toString();
+                                }
+                            }
+                            case "dnf" -> {
+                                java.nio.file.Path rpmFile = buildDir.resolve("waywall-0.5-1.fc42.x86_64.rpm");
+                                if (java.nio.file.Files.exists(rpmFile)) {
+                                    installPackageCmd = "dnf localinstall -y " + rpmFile.toString();
+                                }
+                            }
+                            case "apt" -> {
+                                java.nio.file.Path debFile = buildDir.resolve("waywall_0.5-1_amd64.deb");
+                                if (java.nio.file.Files.exists(debFile)) {
+                                    installPackageCmd = "dpkg -i " + debFile.toString();
+                                }
+                            }
+                        }
+                    }
+
+                    if (installPackageCmd != null) {
+                        ProcessBuilder installPkg = new ProcessBuilder("sudo", "bash", "-c", installPackageCmd);
+                        installPkg.inheritIO();
+                        int installExitCode = installPkg.start().waitFor();
+
+                        if (installExitCode != 0) {
+                            final int finalInstallExitCode = installExitCode;
+                            SwingUtilities.invokeLater(() -> {
+                                finalProgressDialog.dispose();
+                                showDarkMessage(parent, "Error", formatError(ERR_WAYWALL_BUILD_FAILED, "Failed to install waywall package with exit code: " + finalInstallExitCode));
+                            });
+                            return;
+                        }
+                    } else {
+                        SwingUtilities.invokeLater(() -> {
+                            finalProgressDialog.dispose();
+                            showDarkMessage(parent, "Error", formatError(ERR_WAYWALL_BUILD_FAILED, "Could not find waywall package file in " + buildDir));
+                        });
+                        return;
+                    }
+
+                    // Step 7: Complete
+                    SwingUtilities.invokeLater(() -> {
+                        progressBar.setValue(7);
+                        progressBar.setString("Complete");
+                        finalProgressDialog.dispose();
+                        showDarkMessage(parent, "Done", "Waywall + GLFW setup completed successfully!");
+                    });
+
+                } catch (Exception e) {
+                    SwingUtilities.invokeLater(() -> {
+                        finalProgressDialog.dispose();
+                        showDarkMessage(parent, "Error", formatError(ERR_GENERAL_SETUP, "Setup failed:\n" + e.getMessage()));
+                    });
                 }
-            }
+            });
 
-            editScriptFile(dockerDir.resolve("update.sh"));
-            editScriptFile(dockerDir.resolve("build.sh"));
-
-            ProcessBuilder updateSh = new ProcessBuilder("bash", dockerDir.resolve("update.sh").toString());
-            updateSh.directory(dockerDir.toFile());
-            updateSh.inheritIO();
-            exitCode = updateSh.start().waitFor();
-
-            if (exitCode != 0) {
-                showDarkMessage(parent, "Warning", "update.sh completed with exit code: " + exitCode);
-            }
-
-            ProcessBuilder buildSh = new ProcessBuilder("bash", dockerDir.resolve("build.sh").toString());
-            buildSh.directory(dockerDir.toFile());
-            buildSh.inheritIO();
-            exitCode = buildSh.start().waitFor();
-
-            if (exitCode != 0) {
-                showDarkMessage(parent, "Warning", "build.sh completed with exit code: " + exitCode);
-            }
-
-            showDarkMessage(parent, "Done", "Waywall + GLFW setup completed successfully!");
+            installThread.start();
+            progressDialog.setVisible(true);
 
         } catch (Exception e) {
-            showDarkMessage(parent, "Error", "Setup failed:\n" + e.getMessage());
+            if (progressDialog != null) {
+                progressDialog.dispose();
+            }
+            showDarkMessage(parent, "Error", formatError(ERR_GENERAL_SETUP, "Setup failed:\n" + e.getMessage()));
         }
     }
 
@@ -217,6 +455,7 @@ public class PackageInstaller {
         String content = java.nio.file.Files.readString(scriptPath);
         content = content.replaceAll("su podman", "podman");
         content = content.replaceAll("sudo podman", "podman");
+        content = content.replaceAll("sudo docker", "docker");
         java.nio.file.Files.writeString(scriptPath, content);
     }
 
@@ -230,5 +469,9 @@ public class PackageInstaller {
                     } catch (IOException ignored) {}
                 });
         }
+    }
+
+    private static String formatError(int errorCode, String message) {
+        return String.format("[Error %d] %s", errorCode, message);
     }
 }
