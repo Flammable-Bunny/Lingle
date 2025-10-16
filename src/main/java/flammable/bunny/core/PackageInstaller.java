@@ -62,11 +62,11 @@ public class PackageInstaller {
         Map<String, String> prism = new HashMap<>();
         prism.put("pacman", "prismlauncher jdk17-openjdk");
         prism.put("apt", "prismlauncher openjdk-17-jdk");
-        prism.put("dnf", ""); // Special handling for Fedora COPR
+        prism.put("dnf", ""); // Special stuff becase fedora needs g3tchoo copr
         PACKAGE_MAPPINGS.put("Prism Launcher", prism);
 
         Map<String, String> obs = new HashMap<>();
-        obs.put("pacman", "obs-studio");
+        obs.put("pacman", ""); // Special stuff for Arch because Chaotic-AUR
         obs.put("apt", "obs-studio");
         obs.put("dnf", "obs-studio");
         PACKAGE_MAPPINGS.put("OBS Studio", obs);
@@ -76,6 +76,11 @@ public class PackageInstaller {
         discord.put("apt", "discord");
         discord.put("dnf", "discord");
         PACKAGE_MAPPINGS.put("Discord", discord);
+
+        PACKAGE_MAPPINGS.put("ModCheck", new HashMap<>());
+        PACKAGE_MAPPINGS.put("Ninjabrain Bot", new HashMap<>());
+        PACKAGE_MAPPINGS.put("Paceman Tracker", new HashMap<>());
+        PACKAGE_MAPPINGS.put("MapCheck", new HashMap<>());
     }
 
     public static void installPackages(List<String> packageNames, JFrame parent) {
@@ -135,6 +140,19 @@ public class PackageInstaller {
                 } else if (pkgName.equals("Discord")) {
                     isDiscord = true;
                     addPackageIfAvailable("Discord", pkgManager, toInstall);
+                } else if (pkgName.equals("OBS Studio")) {
+                    // Special handling for Arch with Chaotic-AUR
+                    if ("pacman".equals(pkgManager)) {
+                        try {
+                            ChaoticAURInstaller.installOBS();
+                            showDarkMessage(parent, "Done", "OBS Studio installed successfully from Chaotic-AUR!");
+                        } catch (Exception e) {
+                            showDarkMessage(parent, "Error", formatError(ERR_INSTALL_FAILED, "Failed to install OBS Studio:\n" + e.getMessage()));
+                        }
+                        return;
+                    } else {
+                        addPackageIfAvailable("OBS Studio", pkgManager, toInstall);
+                    }
                 } else {
                     addPackageIfAvailable(pkgName, pkgManager, toInstall);
                 }
