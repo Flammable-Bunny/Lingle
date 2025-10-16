@@ -78,18 +78,19 @@ public class LingleUI extends JFrame {
         for (JButton btn : new JButton[]{tmpfsNavButton, settingsNavButton}) {
             btn.setBackground(BTN_BG);
             btn.setForeground(TXT);
-            btn.setBorder(BorderFactory.createLineBorder(BTN_BORDER, 1));
+            btn.setBorder(new UIUtils.RoundedBorder(BTN_BORDER, 1, 8, false));
             btn.setFocusPainted(false);
             btn.setFont(UI_FONT);
             btn.setPreferredSize(new Dimension(80, 35));
+            UIUtils.setupNavButton(btn);
             btn.addMouseListener(new MouseAdapter() {
                 @Override public void mouseEntered(MouseEvent e) {
-                    btn.setBackground(BTN_HOVER);
-                    btn.setBorder(BorderFactory.createLineBorder(BTN_HOVER_BORDER, 1));
+                    btn.setBorder(new UIUtils.RoundedBorder(BTN_HOVER_BORDER, 1, 8, true));
+                    btn.repaint();
                 }
                 @Override public void mouseExited(MouseEvent e) {
-                    btn.setBackground(BTN_BG);
-                    btn.setBorder(BorderFactory.createLineBorder(BTN_BORDER, 1));
+                    btn.setBorder(new UIUtils.RoundedBorder(BTN_BORDER, 1, 8, false));
+                    btn.repaint();
                 }
             });
         }
@@ -475,7 +476,7 @@ public class LingleUI extends JFrame {
         mainPanel.setBorder(BorderFactory.createLineBorder(new Color(100, 100, 100), 1));
 
         setContentPane(mainPanel);
-        setSize(525, 790);
+        setSize(530, 790);
         setLocationRelativeTo(null);
         setVisible(true);
     }

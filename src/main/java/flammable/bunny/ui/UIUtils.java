@@ -10,19 +10,107 @@ public class UIUtils {
 
     public static void applyNormal(AbstractButton b) {
         b.setBackground(BTN_BG);
-        b.setBorder(BorderFactory.createLineBorder(BTN_BORDER, 2));
+        b.setBorder(new RoundedBorder(BTN_BORDER, 2, 8, false));
         b.setForeground(TXT);
         b.setFont(UI_FONT);
+        setupButtonPainting(b);
     }
 
     public static void applyHover(AbstractButton b) {
-        b.setBackground(BTN_HOVER);
-        b.setBorder(BorderFactory.createLineBorder(BTN_HOVER_BORDER, 2));
+        b.setBackground(BTN_BG);
+        b.setBorder(new RoundedBorder(BTN_HOVER_BORDER, 2, 8, true));
+        b.repaint();
     }
 
     public static void applySelected(AbstractButton b) {
         b.setBackground(BTN_SELECTED);
-        b.setBorder(BorderFactory.createLineBorder(BTN_HOVER_BORDER, 2));
+        b.setBorder(new RoundedBorder(BTN_HOVER_BORDER, 2, 8, false));
+        setupButtonPainting(b);
+    }
+
+    private static void setupButtonPainting(AbstractButton b) {
+        b.setContentAreaFilled(false);
+        b.setOpaque(false);
+        b.setUI(new javax.swing.plaf.basic.BasicButtonUI() {
+            @Override
+            public void paint(Graphics g, JComponent c) {
+                AbstractButton button = (AbstractButton) c;
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+                // Paint background with rounded corners
+                g2.setColor(button.getBackground());
+                if (button.getBorder() instanceof RoundedBorder) {
+                    RoundedBorder rb = (RoundedBorder) button.getBorder();
+                    g2.fillRoundRect(0, 0, button.getWidth(), button.getHeight(), rb.radius, rb.radius);
+                }
+
+                // Paint border
+                if (button.getBorder() instanceof RoundedBorder) {
+                    RoundedBorder rb = (RoundedBorder) button.getBorder();
+
+                    if (rb.glowEffect) {
+                        // Draw outer glow for hover effect
+                        g2.setColor(new Color(rb.borderColor.getRed(), rb.borderColor.getGreen(), rb.borderColor.getBlue(), 80));
+                        g2.setStroke(new BasicStroke(rb.thickness + 1));
+                        g2.drawRoundRect(2, 2, button.getWidth() - 4, button.getHeight() - 4, rb.radius, rb.radius);
+                    }
+
+                    // Draw main border
+                    g2.setColor(rb.borderColor);
+                    g2.setStroke(new BasicStroke(rb.thickness));
+                    g2.drawRoundRect(rb.thickness/2, rb.thickness/2, button.getWidth() - rb.thickness - 1, button.getHeight() - rb.thickness - 1, rb.radius, rb.radius);
+                }
+
+                // Paint the text
+                FontMetrics fm = g2.getFontMetrics(button.getFont());
+                String text = button.getText();
+                if (text != null && !text.isEmpty()) {
+                    int textX = (button.getWidth() - fm.stringWidth(text)) / 2;
+                    int textY = (button.getHeight() + fm.getAscent() - fm.getDescent()) / 2;
+
+                    g2.setColor(button.getForeground());
+                    g2.setFont(button.getFont());
+                    g2.drawString(text, textX, textY);
+                }
+
+                g2.dispose();
+            }
+        });
+    }
+
+    public static void setupNavButton(AbstractButton b) {
+        setupButtonPainting(b);
+    }
+
+    public static class RoundedBorder implements javax.swing.border.Border {
+        final Color borderColor;
+        final int thickness;
+        final int radius;
+        final boolean glowEffect;
+
+        public RoundedBorder(Color borderColor, int thickness, int radius, boolean glowEffect) {
+            this.borderColor = borderColor;
+            this.thickness = thickness;
+            this.radius = radius;
+            this.glowEffect = glowEffect;
+        }
+
+        @Override
+        public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
+            // Border painting is now handled in the button UI
+        }
+
+        @Override
+        public Insets getBorderInsets(Component c) {
+            return new Insets(thickness + 2, thickness + 8, thickness + 2, thickness + 8);
+        }
+
+        @Override
+        public boolean isBorderOpaque() {
+            return false;
+        }
     }
 
     public static void styleWithHover(AbstractButton b) {
