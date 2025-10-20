@@ -64,7 +64,7 @@ public class LinkInstancesService {
         sb.append("for k in {1..").append(LingleState.instanceCount).append("}\ndo\n")
                 .append("  mkdir -p \"$HOME/Lingle/$k\"\n");
         for (String map : LingleState.selectedPracticeMaps) {
-            sb.append("  ln -sf \"$HOME/.local/share/lingle/saves/")
+            sb.append("  ln -sf \"$HOME/.local/share/lingle/saves/Z_")
                     .append(map).append("\" \"$HOME/Lingle/$k/\"\n");
         }
         sb.append("done\n");
@@ -125,17 +125,13 @@ public class LinkInstancesService {
                     "systemctl enable --now lingle-startup.service"
             );
 
-            ProcessBuilder pb = new ProcessBuilder("pkexec", "bash", "-lc", installCmd);
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-            int ec = p.waitFor();
+            int ec = ElevatedInstaller.runElevatedBash(installCmd);
 
             if (ec == 0) {
                 UIUtils.showDarkMessage(parent, "Success", "System service installed and enabled.");
             } else {
-                String output = new String(p.getInputStream().readAllBytes());
                 UIUtils.showDarkMessage(parent, "Error", "Failed to install/start service (exit " + ec + ").\n" +
-                        "Output:\n" + output + "\n\nEnsure a polkit authentication agent is running.");
+                        "Ensure a polkit authentication agent is running.");
             }
 
         } catch (Exception e) {

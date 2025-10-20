@@ -56,10 +56,6 @@ public class DependencyInstaller {
             throws IOException, InterruptedException {
 
         String joined = String.join(" ", pkgs);
-        List<String> cmd = new ArrayList<>();
-        cmd.add("pkexec");
-        cmd.add("bash");
-        cmd.add("-c");
 
         String installCmd = switch (mgr) {
             case "pacman" -> "pacman -S --noconfirm " + joined;
@@ -73,11 +69,10 @@ public class DependencyInstaller {
             default -> throw new IOException("Unsupported package manager: " + mgr);
         };
 
-        cmd.add(installCmd);
-        new ProcessBuilder(cmd)
-                .inheritIO()
-                .start()
-                .waitFor();
+        int code = ElevatedInstaller.runElevatedBash(installCmd);
+        if (code != 0) {
+            throw new IOException("Dependency install failed with exit code: " + code);
+        }
     }
 
     private static boolean commandExists(String cmd) {

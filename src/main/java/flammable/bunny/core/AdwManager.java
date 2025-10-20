@@ -8,28 +8,28 @@ public class AdwManager {
     private static Process adwProcess = null;
 
     public static void startAdwIfNeeded() {
-        if (!LingleState.adwEnabled) return;
+        if (!LingleState.adwEnabled || !LingleState.enabled) return;
         stopAdwQuietly();
+
         try {
             Path home = Path.of(System.getProperty("user.home"));
             Path scriptsDir = home.resolve(".local/share/lingle/scripts");
             Files.createDirectories(scriptsDir);
 
-            String script = generateAdwScript(home);
+            Path script = scriptsDir.resolve("auto_delete_worlds_tmpfs.sh");
+            Files.writeString(script, generateScript(home), StandardCharsets.UTF_8);
+            script.toFile().setExecutable(true);
 
-            Path adwScript = scriptsDir.resolve("auto_delete_worlds.sh");
-            Files.writeString(adwScript, script, StandardCharsets.UTF_8);
-            adwScript.toFile().setExecutable(true);
-            adwProcess = new ProcessBuilder("/bin/bash", adwScript.toString())
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+            adwProcess = new ProcessBuilder("/bin/bash", script.toString())
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start();
         } catch (IOException ignored) {
             adwProcess = null;
         }
     }
 
-    private static String generateAdwScript(Path home) {
+    private static String generateScript(Path home) {
         long pid = ProcessHandle.current().pid();
         int X = Math.max(0, LingleState.instanceCount);
         int S = Math.max(1, LingleState.adwIntervalSeconds);

@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "flammable.bunny"
-version = "0.5.6"
+version = "v1.0.0"
 
 repositories {
     mavenCentral()

@@ -61,7 +61,9 @@ public class MCSRAppsInstaller {
 
 
     private static String downloadLatestJarFromRepo(String repo) throws IOException, InterruptedException {
-        HttpClient client = HttpClient.newHttpClient();
+        HttpClient client = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.ALWAYS)
+                .build();
 
         String apiUrl = "https://api.github.com/repos/" + repo + "/releases/latest";
         HttpRequest request = HttpRequest.newBuilder()
@@ -76,7 +78,6 @@ public class MCSRAppsInstaller {
             throw new IOException("Failed to get release info for " + repo + ": HTTP " + response.statusCode());
         }
 
-        // Parse JSON to find the JAR asset
         JSONObject releaseJson = new JSONObject(response.body());
         JSONArray assets = releaseJson.getJSONArray("assets");
 
@@ -96,7 +97,6 @@ public class MCSRAppsInstaller {
             throw new IOException("No JAR file found in latest release for " + repo);
         }
 
-        // Download the JAR file
         System.out.println("Downloading from: " + downloadUrl);
         HttpRequest downloadRequest = HttpRequest.newBuilder()
                 .uri(URI.create(downloadUrl))

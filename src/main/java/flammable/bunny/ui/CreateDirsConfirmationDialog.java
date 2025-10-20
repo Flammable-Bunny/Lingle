@@ -25,7 +25,8 @@ public class CreateDirsConfirmationDialog extends JDialog {
 
         JTextArea ta = new JTextArea(
                 "This feature ONLY works on systemd-based distributions (Arch, Fedora, Debian, etc.)\n" +
-                        "It will NOT work on non-systemd distros (Artix, Gentoo, FreeBSD, etc.)."
+                        "It will NOT work on non-systemd distros (Artix, Gentoo, FreeBSD, etc.).\n" +
+                        "Are you sure you want to continue?"
         );
         ta.setEditable(false);
         ta.setLineWrap(true);

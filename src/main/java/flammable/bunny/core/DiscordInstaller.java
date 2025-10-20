@@ -19,21 +19,18 @@ public class DiscordInstaller {
     );
 
     public static void installCustomAppAsar(String pkgManager) throws IOException, InterruptedException {
-        // Download app.asar to temp location
         String tempDir = System.getProperty("java.io.tmpdir");
         Path tempAsar = Path.of(tempDir, "discord-app.asar");
 
         System.out.println("Downloading app.asar...");
         downloadFile(APP_ASAR_URL, tempAsar.toString());
 
-        // Determine location based on package manager
         String targetLocation = null;
         if ("pacman".equals(pkgManager)) {
             targetLocation = "/opt/discord/resources/app.asar";
         } else if ("dnf".equals(pkgManager)) {
             targetLocation = "/usr/lib64/discord/resources/app.asar";
         } else {
-            // For other distros, search for existing location because idk where they are on other distros
             for (String location : POSSIBLE_LOCATIONS) {
                 if (Files.exists(Path.of(location))) {
                     targetLocation = location;
@@ -46,21 +43,19 @@ public class DiscordInstaller {
             throw new IOException("Could not find Discord installation location");
         }
 
-        // Backup existing app.asar
         Path target = Path.of(targetLocation);
         if (Files.exists(target)) {
-            Files.copy(target, Path.of(targetLocation + ".backup"), StandardCopyOption.REPLACE_EXISTING);
+            int backupExitCode = ElevatedInstaller.runElevated("cp", targetLocation, targetLocation + ".backup");
+            if (backupExitCode != 0) {
+                throw new IOException("Failed to backup app.asar with exit code: " + backupExitCode);
+            }
         }
 
-        // Replace with new app.asar
-        ProcessBuilder pb = new ProcessBuilder("sudo", "cp", tempAsar.toString(), targetLocation);
-        pb.inheritIO();
-        int exitCode = pb.start().waitFor();
+        int exitCode = ElevatedInstaller.runElevated("cp", tempAsar.toString(), targetLocation);
         if (exitCode != 0) {
             throw new IOException("Failed to replace app.asar with exit code: " + exitCode);
         }
 
-        // Clean up temp file
         Files.deleteIfExists(tempAsar);
 
         System.out.println("Discord app.asar installed successfully at: " + targetLocation);

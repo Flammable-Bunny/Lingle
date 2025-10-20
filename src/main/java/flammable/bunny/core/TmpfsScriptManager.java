@@ -39,13 +39,13 @@ public class TmpfsScriptManager {
                 COMMENT="# LINGLE tmpfs"
                 LINE="tmpfs ${TARGET} tmpfs defaults,size=${SIZE},uid=${USER_UID},gid=${USER_GID},mode=0700 0 0"
 
-                # Add entry if not exists
+                # Add entry if not exists (using pkexec for both operations)
                 if ! grep -qF "${LINE}" /etc/fstab; then
-                  echo "${COMMENT}" | sudo tee -a /etc/fstab >/dev/null
-                  echo "${LINE}" | sudo tee -a /etc/fstab >/dev/null
+                  echo "${COMMENT}" | pkexec tee -a /etc/fstab >/dev/null
+                  echo "${LINE}" | pkexec tee -a /etc/fstab >/dev/null
                 fi
 
-                # Mount with pkexec so GNOME auth agent works
+                # Mount with pkexec
                 if ! mountpoint -q "${TARGET}"; then
                   pkexec mount -t tmpfs -o size=${SIZE},uid=${USER_UID},gid=${USER_GID},mode=700 tmpfs "${TARGET}"
                 fi
@@ -72,8 +72,8 @@ public class TmpfsScriptManager {
                 fi
 
                 if grep -qF "${LINE}" /etc/fstab; then
-                  sudo sed -i "/${COMMENT}/d" /etc/fstab
-                  sudo sed -i "\\|${LINE}|d" /etc/fstab
+                  pkexec sed -i "/${COMMENT}/d" /etc/fstab
+                  pkexec sed -i "\\|${LINE}|d" /etc/fstab
                 fi
                 """;
     }

@@ -10,32 +10,39 @@ public class ChaoticAURInstaller {
     public static void installOBS() throws IOException, InterruptedException {
         System.out.println("Setting up Chaotic-AUR for Arch Linux...");
 
-        // Add Chaotic-AUR GPG keys
-        runCommand("sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com");
-        runCommand("sudo pacman-key --lsign-key 3056513887B78AEB");
+        ProcessBuilder checkObs = new ProcessBuilder("pacman", "-Q", "obs-studio-stable");
+        checkObs.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+        checkObs.redirectError(ProcessBuilder.Redirect.DISCARD);
+        if (checkObs.start().waitFor() == 0) {
+            System.out.println("OBS Studio already installed, skipping...");
+            return;
+        }
 
-        // Install Chaotic-AUR keyrings and mirrorlist
-        runCommand("sudo pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'");
-        runCommand("sudo pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'");
+        ProcessBuilder checkKey = new ProcessBuilder("pacman-key", "-l");
+        Process keyProcess = checkKey.start();
+        String keyOutput = new String(keyProcess.getInputStream().readAllBytes());
+        keyProcess.waitFor();
+        
+        if (!keyOutput.contains("3056513887B78AEB")) {
+            runCommand("pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com");
+            runCommand("pacman-key --lsign-key 3056513887B78AEB");
+        } else {
+            System.out.println("Chaotic-AUR GPG key already exists, skipping...");
+        }
 
-        // Add Chaotic-AUR repository to pacman.conf
+        runCommand("pacman -U --noconfirm --needed 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'");
+        runCommand("pacman -U --noconfirm --needed 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'");
+
         addChaoticAURToPacmanConf();
 
-        // Refresh package databases
-        runCommand("sudo pacman -Syu --noconfirm");
+        runCommand("pacman -Sy");
 
-        // Install OBS Studio from Chaotic-AUR
-        runCommand("sudo pacman -S --noconfirm chaotic-aur/obs-studio-stable");
-
-        // Install OBS PipeWire audio capture plugin
-        installOBSPipeWirePlugin();
+        runCommand("pacman -S --noconfirm chaotic-aur/obs-studio-stable");
 
         System.out.println("OBS Studio installed successfully from Chaotic-AUR!");
     }
 
-    /**
-     * Adds Chaotic-AUR repository to /etc/pacman.conf under multilib section
-     */
+
     private static void addChaoticAURToPacmanConf() throws IOException, InterruptedException {
         Path pacmanConf = Path.of("/etc/pacman.conf");
 
@@ -46,7 +53,6 @@ public class ChaoticAURInstaller {
         List<String> lines = Files.readAllLines(pacmanConf);
         boolean chaoticExists = false;
 
-        // Check if Chaotic-AUR already exists
         for (String line : lines) {
             if (line.trim().equals("[chaotic-aur]")) {
                 chaoticExists = true;
@@ -56,7 +62,6 @@ public class ChaoticAURInstaller {
         }
 
         if (!chaoticExists) {
-            // Find multilib section and add Chaotic-AUR after it
             StringBuilder newContent = new StringBuilder();
             boolean foundMultilib = false;
             boolean addedChaotic = false;
@@ -78,19 +83,15 @@ public class ChaoticAURInstaller {
                 }
             }
 
-            // If we didn't find a good spot, add at the end
             if (!addedChaotic) {
                 newContent.append("\n[chaotic-aur]\n");
                 newContent.append("Include = /etc/pacman.d/chaotic-mirrorlist\n");
             }
 
-            // Write to temp file first, then use sudo to copy
             Path tempFile = Files.createTempFile("pacman", ".conf");
             Files.writeString(tempFile, newContent.toString());
 
-            ProcessBuilder pb = new ProcessBuilder("sudo", "cp", tempFile.toString(), "/etc/pacman.conf");
-            pb.inheritIO();
-            int exitCode = pb.start().waitFor();
+            int exitCode = ElevatedInstaller.runElevated("cp", tempFile.toString(), "/etc/pacman.conf");
 
             Files.deleteIfExists(tempFile);
 
@@ -102,42 +103,10 @@ public class ChaoticAURInstaller {
         }
     }
 
-    private static void installOBSPipeWirePlugin() {
-        try {
-            // Try yay first
-            System.out.println("Attempting to install obs-pipewire-audio-capture-git with yay...");
-            ProcessBuilder pb = new ProcessBuilder("yay", "-S", "--noconfirm", "obs-pipewire-audio-capture-git");
-            pb.inheritIO();
-            int exitCode = pb.start().waitFor();
 
-            if (exitCode == 0) {
-                System.out.println("OBS PipeWire plugin installed successfully with yay!");
-                return;
-            }
-        } catch (Exception e) {
-            System.out.println("yay failed or not found, trying paru...");
-        }
-
-        try {
-            // Try paru if yay failed
-            System.out.println("Attempting to install obs-pipewire-audio-capture-git with paru...");
-            ProcessBuilder pb = new ProcessBuilder("paru", "-S", "--noconfirm", "obs-pipewire-audio-capture-git");
-            pb.inheritIO();
-            int exitCode = pb.start().waitFor();
-
-            if (exitCode == 0) {
-                System.out.println("OBS PipeWire plugin installed successfully with paru!");
-                return;
-            }
-        } catch (Exception e) {
-            System.out.println("Warning: Could not install obs-pipewire-audio-capture-git. Neither yay nor paru succeeded.");
-        }
-    }
 
     private static void runCommand(String command) throws IOException, InterruptedException {
-        ProcessBuilder pb = new ProcessBuilder("bash", "-c", command);
-        pb.inheritIO();
-        int exitCode = pb.start().waitFor();
+        int exitCode = ElevatedInstaller.runElevatedBash(command);
         if (exitCode != 0) {
             throw new IOException("Command failed with exit code " + exitCode + ": " + command);
         }

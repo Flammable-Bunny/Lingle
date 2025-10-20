@@ -3,7 +3,6 @@ package flammable.bunny;
 import flammable.bunny.core.*;
 import flammable.bunny.ui.*;
 
-import javax.swing.*;
 import java.io.IOException;
 import com.formdev.flatlaf.FlatDarkLaf;
 import javax.swing.SwingUtilities;
@@ -13,6 +12,13 @@ public class Main {
     public static void main(String[] args) {
 
         FlatDarkLaf.setup();
+
+        String userName = System.getProperty("user.name");
+        if ("root".equals(userName)) {
+            UIUtils.showDarkMessage(null, "Warning", "Please do not run Lingle with sudo. Running as root can cause permission issues and Lingle will install software in the incorrect locations.");
+            return;
+        }
+
         DistroDetector.detectAndSaveDistro();
 
         boolean nogui = args.length > 0 && "--nogui".equals(args[0]);
@@ -44,6 +50,12 @@ public class Main {
         }
 
         try {
+            String jarPath = Main.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+            String homeRelative = WaywallConfig.toHomeRelative(java.nio.file.Path.of(jarPath));
+            WaywallConfig.setPathVar("lingle_path", homeRelative);
+        } catch (Exception ignored) {}
+
+        try {
             LinkInstancesService.preparePracticeMapLinks();
         } catch (IOException e) {
             String msg = "Failed to prepare practice map links: " + e.getMessage();
@@ -67,7 +79,14 @@ public class Main {
             }
         }
 
-        Runtime.getRuntime().addShutdownHook(new Thread(AdwManager::stopAdwQuietly));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            AdwManager.stopAdwQuietly();
+            if (LingleState.worldBopperEnabled) {
+                try {
+                    WorldBopperManager.runOnce();
+                } catch (Exception ignored) {}
+            }
+        }));
 
         if (nogui) {
             System.out.println("Running Lingle in nogui mode");
@@ -81,4 +100,5 @@ public class Main {
         System.setProperty("swing.aatext", "true");
         SwingUtilities.invokeLater(LingleUI::new);
     }
+
 }
