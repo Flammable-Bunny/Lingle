@@ -41,7 +41,7 @@ public class WaywallKeycodeTranslater {
         KEY_MAP.put(KeyEvent.VK_P, "P");
         KEY_MAP.put(KeyEvent.VK_OPEN_BRACKET, "LEFTBRACE");
         KEY_MAP.put(KeyEvent.VK_CLOSE_BRACKET, "RIGHTBRACE");
-        KEY_MAP.put(KeyEvent.VK_ENTER, "ENTER");
+        KEY_MAP.put(KeyEvent.VK_BACK_SLASH, "BACKSLASH");
         KEY_MAP.put(KeyEvent.VK_CONTROL, "LEFTCTRL");
         KEY_MAP.put(KeyEvent.VK_A, "A");
         KEY_MAP.put(KeyEvent.VK_S, "S");
@@ -54,9 +54,9 @@ public class WaywallKeycodeTranslater {
         KEY_MAP.put(KeyEvent.VK_L, "L");
         KEY_MAP.put(KeyEvent.VK_SEMICOLON, "SEMICOLON");
         KEY_MAP.put(KeyEvent.VK_QUOTE, "APOSTROPHE");
+        KEY_MAP.put(KeyEvent.VK_ENTER, "ENTER");
         KEY_MAP.put(KeyEvent.VK_BACK_QUOTE, "GRAVE");
         KEY_MAP.put(KeyEvent.VK_SHIFT, "LEFTSHIFT");
-        KEY_MAP.put(KeyEvent.VK_BACK_SLASH, "BACKSLASH");
         KEY_MAP.put(KeyEvent.VK_Z, "Z");
         KEY_MAP.put(KeyEvent.VK_X, "X");
         KEY_MAP.put(KeyEvent.VK_C, "C");
@@ -81,6 +81,20 @@ public class WaywallKeycodeTranslater {
         KEY_MAP.put(KeyEvent.VK_F8, "F8");
         KEY_MAP.put(KeyEvent.VK_F9, "F9");
         KEY_MAP.put(KeyEvent.VK_F10, "F10");
+        KEY_MAP.put(KeyEvent.VK_F11, "F11");
+        KEY_MAP.put(KeyEvent.VK_F12, "F12");
+        KEY_MAP.put(KeyEvent.VK_F13, "F13");
+        KEY_MAP.put(KeyEvent.VK_F14, "F14");
+        KEY_MAP.put(KeyEvent.VK_F15, "F15");
+        KEY_MAP.put(KeyEvent.VK_F16, "F16");
+        KEY_MAP.put(KeyEvent.VK_F17, "F17");
+        KEY_MAP.put(KeyEvent.VK_F18, "F18");
+        KEY_MAP.put(KeyEvent.VK_F19, "F19");
+        KEY_MAP.put(KeyEvent.VK_F20, "F20");
+        KEY_MAP.put(KeyEvent.VK_F21, "F21");
+        KEY_MAP.put(KeyEvent.VK_F22, "F22");
+        KEY_MAP.put(KeyEvent.VK_F23, "F23");
+        KEY_MAP.put(KeyEvent.VK_F24, "F24");
         KEY_MAP.put(KeyEvent.VK_NUM_LOCK, "NUMLOCK");
         KEY_MAP.put(KeyEvent.VK_SCROLL_LOCK, "SCROLLLOCK");
         KEY_MAP.put(KeyEvent.VK_NUMPAD7, "KP7");
@@ -96,8 +110,6 @@ public class WaywallKeycodeTranslater {
         KEY_MAP.put(KeyEvent.VK_NUMPAD3, "KP3");
         KEY_MAP.put(KeyEvent.VK_NUMPAD0, "KP0");
         KEY_MAP.put(KeyEvent.VK_DECIMAL, "KPDOT");
-        KEY_MAP.put(KeyEvent.VK_F11, "F11");
-        KEY_MAP.put(KeyEvent.VK_F12, "F12");
         KEY_MAP.put(KeyEvent.VK_DIVIDE, "KPSLASH");
         KEY_MAP.put(KeyEvent.VK_PRINTSCREEN, "SYSRQ");
         KEY_MAP.put(KeyEvent.VK_HOME, "HOME");
@@ -123,40 +135,15 @@ public class WaywallKeycodeTranslater {
         KEY_MAP.put(KeyEvent.VK_FIND, "FIND");
         KEY_MAP.put(KeyEvent.VK_CUT, "CUT");
         KEY_MAP.put(KeyEvent.VK_HELP, "HELP");
-        KEY_MAP.put(KeyEvent.VK_F13, "F13");
-        KEY_MAP.put(KeyEvent.VK_F14, "F14");
-        KEY_MAP.put(KeyEvent.VK_F15, "F15");
-        KEY_MAP.put(KeyEvent.VK_F16, "F16");
-        KEY_MAP.put(KeyEvent.VK_F17, "F17");
-        KEY_MAP.put(KeyEvent.VK_F18, "F18");
-        KEY_MAP.put(KeyEvent.VK_F19, "F19");
-        KEY_MAP.put(KeyEvent.VK_F20, "F20");
-        KEY_MAP.put(KeyEvent.VK_F21, "F21");
-        KEY_MAP.put(KeyEvent.VK_F22, "F22");
-        KEY_MAP.put(KeyEvent.VK_F23, "F23");
-        KEY_MAP.put(KeyEvent.VK_F24, "F24");
 
 
         MOUSE_MAP.put(1, "lmb");
-        MOUSE_MAP.put(2, "mmb");
-        MOUSE_MAP.put(3, "rmb");
-        MOUSE_MAP.put(4, "mb4");
-        MOUSE_MAP.put(5, "mb5");
-        MOUSE_MAP.put(6, "mb6");
-        MOUSE_MAP.put(7, "mb7");
-        MOUSE_MAP.put(8, "mb8");
-        MOUSE_MAP.put(9, "mb9");
-        MOUSE_MAP.put(10, "mb10");
-        MOUSE_MAP.put(11, "mb11");
-        MOUSE_MAP.put(12, "mb12");
-        MOUSE_MAP.put(13, "mb13");
-        MOUSE_MAP.put(14, "mb14");
-        MOUSE_MAP.put(15, "mb15");
-        MOUSE_MAP.put(16, "mb16");
-        MOUSE_MAP.put(17, "mb17");
-        MOUSE_MAP.put(18, "mb18");
-        MOUSE_MAP.put(19, "mb19");
-        MOUSE_MAP.put(20, "mb20");
+        MOUSE_MAP.put(2, "rmb");
+        MOUSE_MAP.put(3, "mmb");
+        MOUSE_MAP.put(8, "mb4");
+        MOUSE_MAP.put(9, "mb5");
+        for (int i = 10; i <= 20; i++)
+            MOUSE_MAP.put(i, "mb" + (i - 6));
 
 
         MODIFIER_MAP.put("shift", "Shift");
