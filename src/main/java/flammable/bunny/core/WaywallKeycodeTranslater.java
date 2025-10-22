@@ -142,8 +142,21 @@ public class WaywallKeycodeTranslater {
         MOUSE_MAP.put(3, "rmb");
         MOUSE_MAP.put(6, "mb4");
         MOUSE_MAP.put(7, "mb5");
-        for (int i = 8; i <= 20; i++)
-            MOUSE_MAP.put(i, "mb" + (i - 2));
+        MOUSE_MAP.put(8, "mb6");
+        MOUSE_MAP.put(9, "mb7");
+        MOUSE_MAP.put(10, "mb8");
+        MOUSE_MAP.put(11, "mb9");
+        MOUSE_MAP.put(12, "mb10");
+        MOUSE_MAP.put(13, "mb11");
+        MOUSE_MAP.put(14, "mb12");
+        MOUSE_MAP.put(15, "mb13");
+        MOUSE_MAP.put(16, "mb14");
+        MOUSE_MAP.put(17, "mb15");
+        MOUSE_MAP.put(18, "mb16");
+        MOUSE_MAP.put(19, "mb17");
+        MOUSE_MAP.put(20, "mb18");
+        MOUSE_MAP.put(21, "mb19");
+        MOUSE_MAP.put(22, "mb20");
 
 
         MODIFIER_MAP.put("shift", "Shift");
