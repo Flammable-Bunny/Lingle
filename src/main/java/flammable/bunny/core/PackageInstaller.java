@@ -89,11 +89,14 @@ public class PackageInstaller {
     }
 
     public static void installPackages(List<String> packageNames, JFrame parent) {
+        LingleLogger.logInfo("Starting package installation...");
         String pkgManager = detectPackageManager();
         if (pkgManager == null) {
+            LingleLogger.logError("Could not detect package manager");
             showDarkMessage(parent, "Error", formatError(ERR_PKG_MGR_NOT_DETECTED, "Could not detect package manager."));
             return;
         }
+        LingleLogger.logInfo("Package manager detected: " + pkgManager);
 
         int tempSteps = 0;
         for (String pkg : packageNames) {
@@ -159,14 +162,19 @@ public class PackageInstaller {
                 }
 
                 if (hasWaywall) {
+                    LingleLogger.logInfo("Installing Waywall + GLFW...");
                     if (!isSupportedDistro(pkgManager)) {
+                        LingleLogger.logError("Waywall: Unsupported distro for package manager: " + pkgManager);
                         errors.add(formatError(ERR_UNSUPPORTED_DISTRO, "Waywall: Unsupported distro"));
                     } else {
                         if ("dnf".equals(pkgManager)) {
                             try {
                                 updateProgress(progressBar, currentStep.incrementAndGet(), totalSteps, "Installing Fedora Waywall dependencies");
+                                LingleLogger.logInfo("Installing Fedora Waywall dependencies...");
                                 FedoraInstaller.installWaywallDependencies();
+                                LingleLogger.logSuccess("Fedora Waywall dependencies installed");
                             } catch (Exception e) {
+                                LingleLogger.logError("Waywall Fedora dependencies failed", e);
                                 errors.add(formatError(ERR_INSTALL_FAILED, "Waywall Fedora dependencies: " + e.getMessage()));
                             }
                         }
@@ -178,12 +186,16 @@ public class PackageInstaller {
                 }
 
                 if (hasPrism) {
+                    LingleLogger.logInfo("Installing Prism Launcher...");
                     if ("dnf".equals(pkgManager)) {
                         try {
                             updateProgress(progressBar, currentStep.incrementAndGet(), totalSteps, "Installing Prism Launcher (COPR)");
+                            LingleLogger.logInfo("Installing Prism Launcher via COPR...");
                             FedoraInstaller.installPrismLauncher();
+                            LingleLogger.logSuccess("Prism Launcher installed successfully");
                             success.add("Prism Launcher");
                         } catch (Exception e) {
+                            LingleLogger.logError("Prism Launcher installation failed", e);
                             errors.add(formatError(ERR_PRISM_INSTALL_FAILED, "Prism Launcher: " + e.getMessage()));
                         }
                     } else {
@@ -222,12 +234,15 @@ public class PackageInstaller {
                 if (!regularPackages.isEmpty()) {
                     try {
                         updateProgress(progressBar, currentStep.incrementAndGet(), totalSteps, "Installing packages via " + pkgManager);
+                        LingleLogger.logInfo("Installing regular packages: " + String.join(", ", regularPackages));
                         executeInstall(pkgManager, regularPackages);
+                        LingleLogger.logSuccess("Regular packages installed successfully");
 
                         if (hasPrism && !"dnf".equals(pkgManager)) success.add("Prism Launcher");
                         if (hasOBS && !"pacman".equals(pkgManager)) success.add("OBS Studio");
                         if (hasDiscord) success.add("Discord");
                     } catch (Exception e) {
+                        LingleLogger.logError("Package installation failed", e);
                         errors.add(formatError(ERR_INSTALL_FAILED, "Package install: " + e.getMessage()));
                     }
                 }
@@ -235,8 +250,11 @@ public class PackageInstaller {
                 if (hasDiscord && !errors.stream().anyMatch(e -> e.contains("Discord"))) {
                     try {
                         updateProgress(progressBar, currentStep.incrementAndGet(), totalSteps, "Configuring Discord (OpenAsar)");
+                        LingleLogger.logInfo("Configuring Discord with OpenAsar...");
                         DiscordInstaller.installCustomAppAsar(pkgManager);
+                        LingleLogger.logSuccess("Discord OpenAsar configured");
                     } catch (Exception e) {
+                        LingleLogger.logError("Discord OpenAsar configuration failed", e);
                         errors.add(formatError(ERR_DISCORD_INSTALL_FAILED, "Discord OpenAsar: " + e.getMessage()));
                     }
                 }
@@ -244,12 +262,14 @@ public class PackageInstaller {
                 for (String app : mcsrApps) {
                     try {
                         updateProgress(progressBar, currentStep.incrementAndGet(), totalSteps, "Downloading " + app);
+                        LingleLogger.logInfo("Installing " + app + "...");
                         switch (app) {
                             case "ModCheck" -> MCSRAppsInstaller.installModCheck();
                             case "Ninjabrain Bot" -> MCSRAppsInstaller.installNinjabrainBot();
                             case "Paceman Tracker" -> MCSRAppsInstaller.installPacemanTracker();
                             case "MapCheck" -> MCSRAppsInstaller.installMapCheck();
                         }
+                        LingleLogger.logSuccess(app + " installed successfully");
                         success.add(app);
                     } catch (Exception e) {
                         int errorCode = switch (app) {
@@ -259,16 +279,20 @@ public class PackageInstaller {
                             case "MapCheck" -> ERR_MAPCHECK_INSTALL_FAILED;
                             default -> ERR_INSTALL_FAILED;
                         };
+                        LingleLogger.logError(app + " installation failed", e);
                         errors.add(formatError(errorCode, app + ": " + e.getMessage()));
                     }
                 }
 
                 if (hasWaywall && !errors.stream().anyMatch(e -> e.contains("Waywall"))) {
                     try {
+                        LingleLogger.logInfo("Setting up Waywall + GLFW...");
                         setupWaywallGLFW(progressBar, currentStep.get(), totalSteps);
                         currentStep.addAndGet(7);
+                        LingleLogger.logSuccess("Waywall + GLFW setup completed");
                         success.add("Waywall + GLFW");
                     } catch (Exception e) {
+                        LingleLogger.logError("Waywall setup failed", e);
                         errors.add(formatError(ERR_GENERAL_SETUP, "Waywall setup: " + e.getMessage()));
                     }
                 }
@@ -276,9 +300,12 @@ public class PackageInstaller {
                 if (hasDebounce) {
                     try {
                         updateProgress(progressBar, currentStep.incrementAndGet(), totalSteps, "Installing debounce configuration");
+                        LingleLogger.logInfo("Installing debounce configuration...");
                         DebounceInstaller.installDebounceScript();
+                        LingleLogger.logSuccess("Debounce configuration installed");
                         success.add("Decrease Linux Debounce Time");
                     } catch (Exception e) {
+                        LingleLogger.logError("Debounce configuration failed", e);
                         errors.add(formatError(ERR_INSTALL_FAILED, "Debounce config: " + e.getMessage()));
                     }
                 }
@@ -286,9 +313,12 @@ public class PackageInstaller {
                 if (hasJemalloc) {
                     try {
                         updateProgress(progressBar, currentStep.incrementAndGet(), totalSteps, "Installing Jemalloc" );
+                        LingleLogger.logInfo("Installing Jemalloc...");
                         JemallocInstaller.installJemalloc();
+                        LingleLogger.logSuccess("Jemalloc installed successfully");
                         success.add("Jemalloc");
                     } catch (Exception e) {
+                        LingleLogger.logError("Jemalloc installation failed", e);
                         errors.add(formatError(ERR_INSTALL_FAILED, "Jemalloc: " + e.getMessage()));
                     }
                 }
@@ -296,24 +326,31 @@ public class PackageInstaller {
                 if (hasNvidia) {
                     try {
                         updateProgress(progressBar, currentStep.incrementAndGet(), totalSteps, "Installing NVIDIA dependencies");
+                        LingleLogger.logInfo("Installing NVIDIA dependencies...");
                         NvidiaInstaller.installNvidiaDependencies(pkgManager);
+                        LingleLogger.logSuccess("NVIDIA dependencies installed successfully");
                         success.add("Nvidia Dependencies");
                     } catch (Exception e) {
+                        LingleLogger.logError("NVIDIA dependencies installation failed", e);
                         errors.add(formatError(ERR_INSTALL_FAILED, "NVIDIA dependencies: " + e.getMessage()));
                     }
                 }
 
             } catch (Exception e) {
+                LingleLogger.logError("Unexpected error during installation", e);
                 errors.add(formatError(ERR_GENERAL_SETUP, "Unexpected error: " + e.getMessage()));
             } finally {
                 SwingUtilities.invokeLater(() -> {
                     progressDialog.dispose();
 
                     if (errors.isEmpty()) {
+                        LingleLogger.logSuccess("All packages installed successfully: " + String.join(", ", success));
                         showDarkMessage(parent, "Success", "All packages installed successfully!\n\nInstalled: " + String.join(", ", success));
                     } else if (success.isEmpty()) {
+                        LingleLogger.logError("Installation failed: " + String.join(", ", errors));
                         showDarkMessage(parent, "Error", "Installation failed:\n\n" + String.join("\n", errors));
                     } else {
+                        LingleLogger.logInfo("Partial success - Installed: " + String.join(", ", success) + " | Errors: " + errors.size());
                         showDarkMessage(parent, "Partial Success",
                                 "Some packages installed successfully.\n\n" +
                                         "Installed: " + String.join(", ", success) + "\n\n" +
@@ -360,16 +397,35 @@ public class PackageInstaller {
             default -> throw new IOException("Unsupported package manager: " + mgr);
         };
 
-        ElevatedInstaller.runElevatedBash(installCmd);
+        LingleLogger.logCommand(installCmd);
+        int exitCode = ElevatedInstaller.runElevatedBashWithOutput(installCmd);
+        LingleLogger.logInfo("Command exited with code: " + exitCode);
+        if (exitCode != 0) {
+            throw new IOException("Package installation failed with exit code: " + exitCode);
+        }
     }
 
     private static void setupWaywallGLFW(JProgressBar progressBar, int baseStep, int totalSteps) throws Exception {
         String home = System.getProperty("user.home");
 
         updateProgress(progressBar, baseStep + 1, totalSteps, "Downloading pacur");
-        ProcessBuilder goInstall = new ProcessBuilder("bash", "-c", "export PATH=$PATH:$HOME/go/bin && go install github.com/pacur/pacur@latest");
-        goInstall.inheritIO();
-        if (goInstall.start().waitFor() != 0) throw new IOException(formatError(ERR_PACUR_INSTALL_FAILED, "Failed to install pacur"));
+        String goCmd = "export PATH=$PATH:$HOME/go/bin && go install github.com/pacur/pacur@latest";
+        LingleLogger.logCommand(goCmd);
+        ProcessBuilder goInstall = new ProcessBuilder("bash", "-c", goCmd);
+        goInstall.redirectErrorStream(true);
+        Process goProc = goInstall.start();
+
+        // Capture and log output
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(goProc.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                LingleLogger.logOutput(line);
+            }
+        }
+
+        int goExitCode = goProc.waitFor();
+        LingleLogger.logInfo("go install exited with code: " + goExitCode);
+        if (goExitCode != 0) throw new IOException(formatError(ERR_PACUR_INSTALL_FAILED, "Failed to install pacur"));
 
         Path pacurBase = Path.of(home, "go", "pkg", "mod", "github.com", "pacur");
         if (!Files.exists(pacurBase)) throw new IOException(formatError(ERR_PACUR_DIR_NOT_FOUND, "Pacur directory not found"));
@@ -394,28 +450,77 @@ public class PackageInstaller {
                 String.format("rm -rf %s && cd '%s' && sed -i 's/su podman/podman/g; s/sudo podman/podman/g; s/sudo docker/docker/g' update.sh build.sh", dirsToRemove, dockerDir) :
                 String.format("cd '%s' && sed -i 's/su podman/podman/g; s/sudo podman/podman/g; s/sudo docker/docker/g' update.sh build.sh", dockerDir);
 
-        ElevatedInstaller.runElevatedBash(combinedCmd);
+        LingleLogger.logCommand(combinedCmd);
+        int sedExitCode = ElevatedInstaller.runElevatedBashWithOutput(combinedCmd);
+        LingleLogger.logInfo("sed/rm command exited with code: " + sedExitCode);
 
         updateProgress(progressBar, baseStep + 3, totalSteps, "Building pacur containers");
-        ProcessBuilder updateSh = new ProcessBuilder("bash", dockerDir.resolve("update.sh").toString());
-        updateSh.directory(dockerDir.toFile()).inheritIO();
-        if (updateSh.start().waitFor() != 0) throw new IOException(formatError(ERR_UPDATE_SCRIPT_FAILED, "update.sh failed"));
+        Path updateScript = dockerDir.resolve("update.sh");
+        LingleLogger.logCommand("bash " + updateScript);
+        ProcessBuilder updateSh = new ProcessBuilder("bash", updateScript.toString());
+        updateSh.directory(dockerDir.toFile());
+        updateSh.redirectErrorStream(true);
+        Process updateProc = updateSh.start();
 
-        ProcessBuilder buildSh = new ProcessBuilder("bash", dockerDir.resolve("build.sh").toString());
-        buildSh.directory(dockerDir.toFile()).inheritIO();
-        if (buildSh.start().waitFor() != 0) throw new IOException(formatError(ERR_BUILD_SCRIPT_FAILED, "build.sh failed"));
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(updateProc.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                LingleLogger.logOutput(line);
+            }
+        }
+
+        int updateExitCode = updateProc.waitFor();
+        LingleLogger.logInfo("update.sh exited with code: " + updateExitCode);
+        if (updateExitCode != 0) throw new IOException(formatError(ERR_UPDATE_SCRIPT_FAILED, "update.sh failed"));
+
+        Path buildScript = dockerDir.resolve("build.sh");
+        LingleLogger.logCommand("bash " + buildScript);
+        ProcessBuilder buildSh = new ProcessBuilder("bash", buildScript.toString());
+        buildSh.directory(dockerDir.toFile());
+        buildSh.redirectErrorStream(true);
+        Process buildShProc = buildSh.start();
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(buildShProc.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                LingleLogger.logOutput(line);
+            }
+        }
+
+        int buildShExitCode = buildShProc.waitFor();
+        LingleLogger.logInfo("build.sh exited with code: " + buildShExitCode);
+        if (buildShExitCode != 0) throw new IOException(formatError(ERR_BUILD_SCRIPT_FAILED, "build.sh failed"));
 
         updateProgress(progressBar, baseStep + 4, totalSteps, "Cloning waywall");
         Path waywallDir = Path.of(home, "waywall");
-        if (Files.exists(waywallDir)) deleteDirectory(waywallDir);
+        if (Files.exists(waywallDir)) {
+            LingleLogger.logInfo("Removing existing waywall directory: " + waywallDir);
+            deleteDirectory(waywallDir);
+        }
 
-        ProcessBuilder gitClone = new ProcessBuilder("git", "clone", "https://github.com/ByPaco10/waywall", waywallDir.toString()); // https://github.com/tesselslate/waywall
-        gitClone.inheritIO();
-        if (gitClone.start().waitFor() != 0) throw new IOException(formatError(ERR_WAYWALL_CLONE_FAILED, "Failed to clone waywall"));
+        String gitCloneCmd = "git clone https://github.com/ByPaco10/waywall " + waywallDir;
+        LingleLogger.logCommand(gitCloneCmd);
+        ProcessBuilder gitClone = new ProcessBuilder("git", "clone", "https://github.com/ByPaco10/waywall", waywallDir.toString());
+        gitClone.redirectErrorStream(true);
+        Process gitProc = gitClone.start();
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(gitProc.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                LingleLogger.logOutput(line);
+            }
+        }
+
+        int gitExitCode = gitProc.waitFor();
+        LingleLogger.logInfo("git clone exited with code: " + gitExitCode);
+        if (gitExitCode != 0) throw new IOException(formatError(ERR_WAYWALL_CLONE_FAILED, "Failed to clone waywall"));
 
         updateProgress(progressBar, baseStep + 5, totalSteps, "Building waywall packages");
         Path buildPackagesScript = waywallDir.resolve("build-packages.sh");
-        if (!Files.exists(buildPackagesScript)) throw new IOException(formatError(ERR_WAYWALL_BUILD_FAILED, "build-packages.sh not found"));
+        if (!Files.exists(buildPackagesScript)) {
+            LingleLogger.logError("build-packages.sh not found at: " + buildPackagesScript);
+            throw new IOException(formatError(ERR_WAYWALL_BUILD_FAILED, "build-packages.sh not found"));
+        }
 
         String pkgManager = detectPackageManager();
         String distroFlag = pkgManager != null ? switch (pkgManager) {
@@ -425,38 +530,75 @@ public class PackageInstaller {
             default -> null;
         } : null;
 
+        String buildCmd = distroFlag != null ?
+            "bash " + buildPackagesScript + " " + distroFlag :
+            "bash " + buildPackagesScript;
+        LingleLogger.logCommand(buildCmd);
+
         ProcessBuilder buildPackages = distroFlag != null ?
                 new ProcessBuilder("bash", buildPackagesScript.toString(), distroFlag) :
                 new ProcessBuilder("bash", buildPackagesScript.toString());
-        buildPackages.directory(waywallDir.toFile()).inheritIO();
-        if (buildPackages.start().waitFor() != 0) throw new IOException(formatError(ERR_WAYWALL_BUILD_FAILED, "build-packages.sh failed"));
+        buildPackages.directory(waywallDir.toFile());
+        buildPackages.redirectErrorStream(true);
+        Process buildPkgProc = buildPackages.start();
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(buildPkgProc.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                LingleLogger.logOutput(line);
+            }
+        }
+
+        int buildPkgExitCode = buildPkgProc.waitFor();
+        LingleLogger.logInfo("build-packages.sh exited with code: " + buildPkgExitCode);
+        if (buildPkgExitCode != 0) throw new IOException(formatError(ERR_WAYWALL_BUILD_FAILED, "build-packages.sh failed"));
 
         updateProgress(progressBar, baseStep + 6, totalSteps, "Installing waywall package");
         Path buildDir = waywallDir.resolve("waywall-build");
+        LingleLogger.logInfo("Looking for package files in: " + buildDir);
         String installPackageCmd = null;
 
         if (pkgManager != null) {
             switch (pkgManager) {
                 case "pacman" -> {
                     Path pkgFile = buildDir.resolve("waywall-0.5-1-x86_64.pkg.tar.zst");
-                    if (Files.exists(pkgFile)) installPackageCmd = "pacman -U --noconfirm " + pkgFile;
+                    if (Files.exists(pkgFile)) {
+                        installPackageCmd = "pacman -U --noconfirm " + pkgFile;
+                        LingleLogger.logInfo("Found package: " + pkgFile);
+                    } else {
+                        LingleLogger.logError("Package not found: " + pkgFile);
+                    }
                 }
                 case "dnf" -> {
                     Path rpmFile = buildDir.resolve("waywall-0.5-1.fc42.x86_64.rpm");
-                    if (Files.exists(rpmFile)) installPackageCmd = "dnf localinstall -y " + rpmFile;
+                    if (Files.exists(rpmFile)) {
+                        installPackageCmd = "dnf localinstall -y " + rpmFile;
+                        LingleLogger.logInfo("Found package: " + rpmFile);
+                    } else {
+                        LingleLogger.logError("Package not found: " + rpmFile);
+                    }
                 }
                 case "apt" -> {
                     Path debFile = buildDir.resolve("waywall_0.5-1_amd64.deb");
-                    if (Files.exists(debFile)) installPackageCmd = "dpkg -i " + debFile;
+                    if (Files.exists(debFile)) {
+                        installPackageCmd = "dpkg -i " + debFile;
+                        LingleLogger.logInfo("Found package: " + debFile);
+                    } else {
+                        LingleLogger.logError("Package not found: " + debFile);
+                    }
                 }
             }
         }
 
         if (installPackageCmd != null) {
-            if (ElevatedInstaller.runElevatedBash(installPackageCmd) != 0) {
+            LingleLogger.logCommand(installPackageCmd);
+            int installExitCode = ElevatedInstaller.runElevatedBashWithOutput(installPackageCmd);
+            LingleLogger.logInfo("Package install exited with code: " + installExitCode);
+            if (installExitCode != 0) {
                 throw new IOException(formatError(ERR_WAYWALL_PKG_INSTALL_FAILED, "Failed to install waywall package"));
             }
         } else {
+            LingleLogger.logError("No suitable package file found for package manager: " + pkgManager);
             throw new IOException(formatError(ERR_WAYWALL_BUILD_FAILED, "Package file not found"));
         }
 

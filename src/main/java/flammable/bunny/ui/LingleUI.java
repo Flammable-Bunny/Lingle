@@ -16,6 +16,7 @@ import java.util.Map;
 
 import static flammable.bunny.ui.UIConstants.*;
 import static flammable.bunny.ui.UIUtils.*;
+import static flammable.bunny.core.LingleLogger.*;
 
 public class LingleUI extends JFrame {
 
@@ -88,7 +89,8 @@ public class LingleUI extends JFrame {
         JButton installerNavButton = new JButton("Installer");
         JButton settingsNavButton = new JButton("Utilities");
         JButton supportNavButton = new JButton("Support");
-        for (JButton btn : new JButton[]{tmpfsNavButton, installerNavButton, settingsNavButton, supportNavButton}) {
+        JButton logNavButton = new JButton("Log");
+        for (JButton btn : new JButton[]{tmpfsNavButton, installerNavButton, settingsNavButton, supportNavButton, logNavButton}) {
             btn.setBackground(BTN_BG);
             btn.setForeground(TXT);
             btn.setBorder(new UIUtils.RoundedBorder(BTN_BORDER, 1, 8, false));
@@ -111,6 +113,7 @@ public class LingleUI extends JFrame {
         navPanel.add(installerNavButton);
         navPanel.add(tmpfsNavButton);
         navPanel.add(supportNavButton);
+        navPanel.add(logNavButton);
 
         // ===== Main content card =====
         CardLayout cardLayout = new CardLayout();
@@ -322,6 +325,7 @@ public class LingleUI extends JFrame {
 
         // ===== Wire actions =====
         symlinkButton.addActionListener(e -> {
+            logAction("User clicked: Symlink Instances");
             List<String> instanceNames = new ArrayList<>();
             for (Component c : instancesChecks.getComponents()) {
                 if (c instanceof JCheckBox cb && cb.isSelected()) {
@@ -329,21 +333,31 @@ public class LingleUI extends JFrame {
                 }
             }
             if (instanceNames.isEmpty()) {
+                logError("Symlink Instances: No instances selected");
                 showDarkMessage(this, "No Instances Selected", "Please select at least one instance.");
                 return;
             }
+            logInfo("Selected instances: " + String.join(", ", instanceNames));
             int choice = new SymlinkConfirmationDialog(this).showDialog();
-            if (choice != 0) return;
+            if (choice != 0) {
+                logInfo("Symlink operation cancelled by user");
+                return;
+            }
             try {
+                logInfo("Creating symlinks for " + instanceNames.size() + " instance(s)...");
                 LinkInstancesService.symlinkInstances(instanceNames);
+                logSuccess("Symlinks created successfully");
                 showDarkMessage(this, "Done", "Symlinks created.");
             } catch (IOException ex) {
+                logError("Failed to create symlinks", ex);
                 showDarkMessage(this, "Error", "Failed to create symlinks:\n" + ex.getMessage());
             }
         });
 
         linkPracticeBtn.addActionListener(e -> {
+            logAction("User clicked: Link Practice Maps");
             if (LingleState.instanceCount == 0) {
+                logError("Link Practice Maps: No instances symlinked");
                 showDarkMessage(this, "Error", "Please symlink at least one instance before linking practice maps.");
                 return;
             }
@@ -354,41 +368,64 @@ public class LingleUI extends JFrame {
                 }
             }
             if (chosen.isEmpty()) {
+                logError("Link Practice Maps: No maps selected");
                 showDarkMessage(this, "No Maps Selected", "Please select at least one practice map.");
                 return;
             }
+            logInfo("Selected practice maps: " + String.join(", ", chosen));
             try {
                 LingleState.selectedPracticeMaps = chosen;
                 LingleState.practiceMaps = true;
                 LingleState.saveState();
+                logInfo("Linking practice maps...");
                 LinkInstancesService.linkPracticeMapsNow();
+                logSuccess("Practice maps linked successfully");
                 showDarkMessage(this, "Done", "Practice maps linked.");
             } catch (IOException ex) {
+                logError("Failed to link practice maps", ex);
                 showDarkMessage(this, "Error", ex.getMessage());
             }
         });
 
         createDirsBtn.addActionListener(e -> {
+            logAction("User clicked: Create Directories on Startup");
             int choice = new CreateDirsConfirmationDialog(this).showDialog();
-            if (choice != 0) return;
+            if (choice != 0) {
+                logInfo("Create directories operation cancelled by user");
+                return;
+            }
             try {
+                logInfo("Preparing practice map links...");
                 LinkInstancesService.preparePracticeMapLinks();
+                logInfo("Installing create directories service...");
                 LinkInstancesService.installCreateDirsService(this);
+                logSuccess("Create directories service installed");
             } catch (IOException ex) {
+                logError("Failed to install create directories service", ex);
                 showDarkMessage(this, "Error", ex.getMessage());
             }
         });
 
         adwEnableBtn.addActionListener(e -> {
+            logAction("User clicked: " + (LingleState.adwEnabled ? "Disable" : "Enable") + " ADW");
             try {
                 LingleState.adwEnabled = !LingleState.adwEnabled;
                 LingleState.saveState();
+                logInfo("Setting waywall toggle_lingle to: " + LingleState.adwEnabled);
                 WaywallConfig.setToggle("toggle_lingle", LingleState.adwEnabled);
-                if (LingleState.adwEnabled) AdwManager.startAdwIfNeeded(); else AdwManager.stopAdwQuietly();
+                if (LingleState.adwEnabled) {
+                    logInfo("Starting ADW...");
+                    AdwManager.startAdwIfNeeded();
+                } else {
+                    logInfo("Stopping ADW...");
+                    AdwManager.stopAdwQuietly();
+                }
                 adwEnableBtn.setText(LingleState.adwEnabled ? "Disable ADW" : "Enable ADW");
                 String mode = LingleState.enabled ? "TMPFS" : "Normal";
+                logSuccess("ADW " + (LingleState.adwEnabled ? "enabled" : "disabled") + " in " + mode + " mode");
                 showDarkMessage(this, "Updated", mode + " ADW " + (LingleState.adwEnabled ? "enabled" : "disabled"));
             } catch (IOException ex) {
+                logError("Failed to apply ADW toggle", ex);
                 showDarkMessage(this, "Error", "Failed to apply ADW toggle: " + ex.getMessage());
             }
         });
@@ -432,16 +469,20 @@ public class LingleUI extends JFrame {
         settingsPanel.add(waywallToggleRow);
 
         pacemanBtn.addActionListener(e -> {
+            logAction("User clicked: Toggle Paceman Tracker");
             try {
                 boolean cur = WaywallConfig.getToggle("toggle_paceman", false);
                 WaywallConfig.setToggle("toggle_paceman", !cur);
                 pacemanBtn.setText(!cur ? "Disable Paceman Tracker" : "Enable Paceman Tracker");
+                logSuccess("Paceman Tracker " + (!cur ? "enabled" : "disabled"));
             } catch (IOException ex) {
+                logError("Failed to toggle Paceman Tracker", ex);
                 showDarkMessage(this, "Error", "Failed to update toggles.lua: " + ex.getMessage());
             }
         });
 
         worldBopperBtn.addActionListener(e -> {
+            logAction("User clicked: WorldBopper");
             showWorldBopperDialog();
         });
 
@@ -477,6 +518,7 @@ public class LingleUI extends JFrame {
 
 
         bgBtn.addActionListener(e -> {
+            logAction("User clicked: Toggle Custom Background Image");
             try {
                 boolean cur = WaywallConfig.getToggle("toggle_bg_picture", false);
                 WaywallConfig.setToggle("toggle_bg_picture", !cur);
@@ -486,7 +528,9 @@ public class LingleUI extends JFrame {
                     ui.browse.setEnabled(!cur);
                     ui.tf.setBackground(!cur ? new Color(60,63,65) : new Color(50,52,54));
                 }
+                logSuccess("Custom Background Image " + (!cur ? "enabled" : "disabled"));
             } catch (IOException ex) {
+                logError("Failed to toggle Custom Background Image", ex);
                 showDarkMessage(this, "Error", "Failed to update toggles.lua: " + ex.getMessage());
             }
         });
@@ -642,6 +686,7 @@ public class LingleUI extends JFrame {
         settingsPanel.add(remapsBtn);
 
         keybindsBtn.addActionListener(e -> {
+            logAction("User clicked: Keybinds");
             JPanel glassPane = new JPanel(null) {
                 @Override
                 protected void paintComponent(Graphics g) {
@@ -855,7 +900,10 @@ public class LingleUI extends JFrame {
             glassPane.setVisible(true);
         });
 
-        remapsBtn.addActionListener(e -> showRemapsDialog());
+        remapsBtn.addActionListener(e -> {
+            logAction("User clicked: Remaps");
+            showRemapsDialog();
+        });
 
         settingsPanel.add(Box.createVerticalStrut(10));
 
@@ -865,7 +913,11 @@ public class LingleUI extends JFrame {
         settingsPanel.add(Box.createVerticalGlue());
 
         packagesButton.addActionListener(e -> {
-            if (!DependencyInstaller.ensureDeps(this)) return;
+            logAction("User clicked: Zip Packages for Run Submission");
+            if (!DependencyInstaller.ensureDeps(this)) {
+                logError("Dependencies check failed");
+                return;
+            }
 
             JFileChooser fc = new JFileChooser();
             fc.setDialogTitle("Select output folder for SRC zip");
@@ -989,22 +1041,29 @@ public class LingleUI extends JFrame {
                 }
             }
             if (selected.isEmpty()) {
+                logError("Install Selected: No packages selected");
                 showDarkMessage(this, "No Selection", "Please select at least one package to install.");
                 return;
             }
+            logAction("User clicked: Install Selected - Packages: " + String.join(", ", selected));
             PackageInstaller.installPackages(selected, this);
         });
 
         debounceButton.addActionListener(e -> {
+            logAction("User clicked: Decrease Linux Debounce Time");
             try {
+                logInfo("Installing debounce script...");
                 DebounceInstaller.installDebounceScript();
+                logSuccess("Debounce time decreased successfully - restart required");
                 showDarkMessage(this, "Success", "Debounce time decreased successfully.\n\nYou must restart your system for changes to take effect.\n\nThis is a one-time configuration.");
             } catch (Exception ex) {
+                logError("Failed to decrease debounce time", ex);
                 showDarkMessage(this, "Error", "Failed to decrease debounce time:\n" + ex.getMessage());
             }
         });
 
         configurePrismButton.addActionListener(e -> {
+            logAction("User clicked: Configure Prism Settings");
             showConfigurePrismDialog();
         });
 
@@ -1034,14 +1093,112 @@ public class LingleUI extends JFrame {
         }
         supportPanel.add(Box.createVerticalGlue());
 
+        // ===== Log panel =====
+        JPanel logPanel = new JPanel(new BorderLayout(10, 10));
+        logPanel.setBackground(BG);
+        logPanel.setBorder(BorderFactory.createEmptyBorder(15, 10, 15, 10));
+
+        JLabel logTitle = new JLabel("System Log");
+        logTitle.setForeground(TXT);
+        logTitle.setFont(UI_FONT_BOLD);
+        logTitle.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
+
+        JTextArea logTextArea = new JTextArea();
+        logTextArea.setEditable(false);
+        logTextArea.setBackground(new Color(30, 30, 30));
+        logTextArea.setForeground(new Color(200, 200, 200));
+        logTextArea.setFont(new Font("Monospaced", Font.PLAIN, 11));
+        logTextArea.setLineWrap(false);
+        logTextArea.setWrapStyleWord(false);
+
+        JScrollPane logScrollPane = new JScrollPane(logTextArea);
+        logScrollPane.setBackground(BG);
+        logScrollPane.getViewport().setBackground(new Color(30, 30, 30));
+        logScrollPane.setBorder(BorderFactory.createLineBorder(new Color(100, 100, 100), 1));
+        logScrollPane.getVerticalScrollBar().setUnitIncrement(16);
+
+        // Register the text area with the logger
+        LingleLogger.registerListener(logTextArea);
+
+        JPanel logButtonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        logButtonPanel.setBackground(BG);
+
+        JButton copyLogButton = makeButton("Copy Log", 120);
+        JButton exportLogButton = makeButton("Export Log", 120);
+        JButton clearLogButton = makeButton("Clear Log", 120);
+
+        copyLogButton.addActionListener(e -> {
+            try {
+                String logContent = LingleLogger.getAllLogs();
+                java.awt.datatransfer.StringSelection selection = new java.awt.datatransfer.StringSelection(logContent);
+                java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, selection);
+                LingleLogger.logSuccess("Log copied to clipboard");
+                showDarkMessage(this, "Success", "Log copied to clipboard");
+            } catch (Exception ex) {
+                LingleLogger.logError("Failed to copy log to clipboard", ex);
+                showDarkMessage(this, "Error", "Failed to copy log: " + ex.getMessage());
+            }
+        });
+
+        exportLogButton.addActionListener(e -> {
+            try {
+                JFileChooser fileChooser = new JFileChooser();
+                fileChooser.setDialogTitle("Export Log");
+                fileChooser.setSelectedFile(new java.io.File("lingle-log-" + System.currentTimeMillis() + ".txt"));
+
+                if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                    java.io.File file = fileChooser.getSelectedFile();
+                    String logContent = LingleLogger.getAllLogs();
+                    java.nio.file.Files.writeString(file.toPath(), logContent);
+                    LingleLogger.logSuccess("Log exported to: " + file.getAbsolutePath());
+                    showDarkMessage(this, "Success", "Log exported to:\n" + file.getAbsolutePath());
+                }
+            } catch (Exception ex) {
+                LingleLogger.logError("Failed to export log", ex);
+                showDarkMessage(this, "Error", "Failed to export log: " + ex.getMessage());
+            }
+        });
+
+        clearLogButton.addActionListener(e -> {
+            int choice = JOptionPane.showConfirmDialog(this,
+                "Are you sure you want to clear the log?",
+                "Clear Log",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+
+            if (choice == JOptionPane.YES_OPTION) {
+                LingleLogger.clear();
+                LingleLogger.logInfo("Log cleared by user");
+            }
+        });
+
+        logButtonPanel.add(copyLogButton);
+        logButtonPanel.add(exportLogButton);
+        logButtonPanel.add(clearLogButton);
+
+        JPanel logTopPanel = new JPanel(new BorderLayout());
+        logTopPanel.setBackground(BG);
+        logTopPanel.add(logTitle, BorderLayout.NORTH);
+
+        logPanel.add(logTopPanel, BorderLayout.NORTH);
+        logPanel.add(logScrollPane, BorderLayout.CENTER);
+        logPanel.add(logButtonPanel, BorderLayout.SOUTH);
+
+        // Log startup
+        LingleLogger.logInfo("Lingle v" + Updater.CURRENT_VERSION + " started");
+        LingleLogger.logInfo("System: " + System.getProperty("os.name") + " " + System.getProperty("os.version"));
+        LingleLogger.logInfo("Java: " + System.getProperty("java.version"));
+
         contentPanel.add(settingsPanel, "Utilities");
         contentPanel.add(installerPanel, "Installer");
         contentPanel.add(tmpfsPanel, "auToMPFS");
         contentPanel.add(supportPanel, "Support");
+        contentPanel.add(logPanel, "Log");
         settingsNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Utilities"));
         installerNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Installer"));
         tmpfsNavButton.addActionListener(e -> cardLayout.show(contentPanel, "auToMPFS"));
         supportNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Support"));
+        logNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Log"));
         cardLayout.show(contentPanel, "Utilities");
 
         // ===== Frame =====
@@ -1105,16 +1262,24 @@ public class LingleUI extends JFrame {
         runButton.setEnabled(false);
         final boolean runDisable = LingleState.enabled;
 
+        logAction("User clicked: " + (runDisable ? "Disable" : "Enable") + " TMPFS");
+
         new Thread(() -> {
             int exitCode;
             try {
                 Path home = Path.of(System.getProperty("user.home"));
                 Path script = home.resolve(".local/share/lingle/scripts/")
                         .resolve(runDisable ? "tmpfsdisable.sh" : "tmpfsenable.sh");
-                if (!Files.exists(script)) throw new IOException("Script not found: " + script);
+                logInfo("Executing script: " + script);
+                if (!Files.exists(script)) {
+                    logError("Script not found: " + script);
+                    throw new IOException("Script not found: " + script);
+                }
                 Process p = new ProcessBuilder("/bin/bash", script.toString()).start();
                 exitCode = p.waitFor();
+                logInfo("Script execution completed with exit code: " + exitCode);
             } catch (Exception ex) {
+                logError("TMPFS toggle failed", ex);
                 exitCode = 1;
             }
 
@@ -1127,8 +1292,10 @@ public class LingleUI extends JFrame {
                     LingleState.saveState();
                     if (LingleState.adwEnabled) AdwManager.startAdwIfNeeded();
                     else AdwManager.stopAdwQuietly();
+                    logSuccess("TMPFS " + (LingleState.enabled ? "enabled" : "disabled"));
                     showDarkMessage(this, "Success", "TMPFS " + (LingleState.enabled ? "enabled." : "disabled."));
                 } else {
+                    logError("Failed to toggle TMPFS. Exit code: " + ec);
                     showDarkMessage(this, "Lingle", "Failed to execute task. Exit code: " + ec);
                 }
                 runButton.setEnabled(true);
@@ -1260,6 +1427,7 @@ public class LingleUI extends JFrame {
 
         JButton clearNowBtn = makeButton("Clear worlds now", 180);
         clearNowBtn.addActionListener(ev -> {
+            logAction("User clicked: Clear worlds now");
             int confirm = JOptionPane.showConfirmDialog(dlg,
                 "This will immediately delete worlds based on current configuration.\nAre you sure?",
                 "Confirm Clear Worlds",
@@ -1267,11 +1435,16 @@ public class LingleUI extends JFrame {
                 JOptionPane.WARNING_MESSAGE);
             if (confirm == JOptionPane.YES_OPTION) {
                 try {
+                    logInfo("Running WorldBopper...");
                     flammable.bunny.core.WorldBopperManager.runOnce();
+                    logSuccess("Worlds cleared successfully");
                     showDarkMessage(this, "Done", "Worlds cleared");
                 } catch (Exception ex) {
+                    logError("Failed to clear worlds", ex);
                     showDarkMessage(this, "Error", "Failed to clear worlds: " + ex.getMessage());
                 }
+            } else {
+                logInfo("Clear worlds cancelled by user");
             }
         });
 
@@ -1291,11 +1464,13 @@ public class LingleUI extends JFrame {
         body.add(bottomPanel, BorderLayout.SOUTH);
 
         applyBtn.addActionListener(ev -> {
+            logInfo("Applying WorldBopper configuration...");
             // Update selected instances
             LingleState.WorldbopperSelectedInstances.clear();
             for (JCheckBox cb : instanceCheckboxes) {
                 if (cb.isSelected()) LingleState.WorldbopperSelectedInstances.add(cb.getText());
             }
+            logInfo("Selected instances: " + String.join(", ", LingleState.WorldbopperSelectedInstances));
 
             // Update boppable worlds from UI
             LingleState.boppableWorlds.clear();
@@ -1306,16 +1481,19 @@ public class LingleUI extends JFrame {
                         (flammable.bunny.core.WorldBopperConfig.KeepCondition) row.conditionCombo.getSelectedItem();
                     int sizeMB = ((Number)row.sizeSpinner.getValue()).intValue();
                     LingleState.boppableWorlds.add(new flammable.bunny.core.WorldBopperConfig.KeepWorldInfo(prefix, condition, sizeMB));
+                    logInfo("Boppable world rule: prefix='" + prefix + "', condition=" + condition + ", sizeMB=" + sizeMB);
                 }
             }
 
             if (LingleState.WorldbopperSelectedInstances.isEmpty() && enableWorldBopper.isSelected()) {
+                logError("WorldBopper enabled but no instances selected");
                 showDarkMessage(this, "Error", "Please select at least one instance or disable WorldBopper");
                 return;
             }
 
             LingleState.worldBopperEnabled = enableWorldBopper.isSelected();
             LingleState.saveState();
+            logSuccess("WorldBopper configuration saved - " + (LingleState.worldBopperEnabled ? "enabled" : "disabled"));
             dlg.dispose();
             showDarkMessage(this, "Updated", "WorldBopper configuration saved");
         });
@@ -1641,24 +1819,33 @@ public class LingleUI extends JFrame {
             }
 
             if (selectedInstances.isEmpty()) {
+                logError("Configure Prism Settings: No instances selected");
                 showDarkMessage(this, "Error", "Please select at least one instance");
                 return;
             }
 
             try {
+                logInfo("Detecting package manager...");
                 String pkgManager = DistroDetector.getPackageManager();
                 if (pkgManager == null) {
+                    logError("Could not detect package manager");
                     showDarkMessage(this, "Error", "Could not detect package manager");
                     return;
                 }
+                logInfo("Package manager detected: " + pkgManager);
 
                 // Check if NVIDIA GPU is present
+                logInfo("Detecting GPU...");
                 boolean hasNvidiaGPU = detectNvidiaGPU();
+                logInfo("NVIDIA GPU detected: " + hasNvidiaGPU);
 
+                logInfo("Configuring " + selectedInstances.size() + " instance(s): " + String.join(", ", selectedInstances));
                 PrismConfigEditor.configureInstances(selectedInstances, pkgManager, hasNvidiaGPU);
+                logSuccess("Configured " + selectedInstances.size() + " instance(s) successfully");
                 dlg.dispose();
                 showDarkMessage(this, "Success", "Configured " + selectedInstances.size() + " instance(s) successfully");
             } catch (Exception ex) {
+                logError("Failed to configure instances", ex);
                 showDarkMessage(this, "Error", "Failed to configure instances:\n" + ex.getMessage());
             }
         });

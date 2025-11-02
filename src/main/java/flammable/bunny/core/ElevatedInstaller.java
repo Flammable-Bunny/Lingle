@@ -73,6 +73,38 @@ public class ElevatedInstaller {
         }
     }
 
+    public static int runElevatedBashWithOutput(String command) throws IOException, InterruptedException {
+        ensureRootShell();
+        String marker = "__CMD_DONE__" + System.nanoTime();
+        String exitMarker = "__EXIT_CODE__" + System.nanoTime();
+
+        String wrapped = "{ " + command + "; }; echo " + exitMarker + ":$?; echo " + marker + "\n";
+
+        synchronized (SHELL_LOCK) {
+            shellWriter.write(wrapped);
+            shellWriter.flush();
+
+            int exitCode = -1;
+            String line;
+            while ((line = shellReader.readLine()) != null) {
+                if (line.startsWith(exitMarker + ":")) {
+                    try {
+                        exitCode = Integer.parseInt(line.substring((exitMarker + ":").length()).trim());
+                    } catch (NumberFormatException ignored) {
+                        exitCode = -1;
+                    }
+                } else if (line.equals(marker)) {
+                    break;
+                } else {
+                    // Log all output lines to the logger
+                    LingleLogger.logOutput(line);
+                }
+            }
+
+            return exitCode;
+        }
+    }
+
 
     public static int runElevated(String... command) throws IOException, InterruptedException {
         String[] elevatedCommand = new String[command.length + 1];
