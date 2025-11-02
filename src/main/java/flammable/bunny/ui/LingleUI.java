@@ -948,7 +948,6 @@ public class LingleUI extends JFrame {
             "Discord + OpenAsar",
             "OBS Studio",
             "Nvidia Dependencies",
-            "Decrease Linux Debounce Time",
             "Jemalloc"
         };
 
@@ -966,6 +965,20 @@ public class LingleUI extends JFrame {
         installRow.add(installButton);
         installerPanel.add(installRow);
 
+        installerPanel.add(Box.createVerticalStrut(15));
+
+        JButton debounceButton = makeButton("Decrease Linux Debounce Time", 240);
+        JPanel debounceRow = leftRow();
+        debounceRow.add(debounceButton);
+        installerPanel.add(debounceRow);
+
+        installerPanel.add(Box.createVerticalStrut(10));
+
+        JButton configurePrismButton = makeButton("Configure Prism Settings", 220);
+        JPanel configurePrismRow = leftRow();
+        configurePrismRow.add(configurePrismButton);
+        installerPanel.add(configurePrismRow);
+
         installerPanel.add(Box.createVerticalGlue());
 
         installButton.addActionListener(e -> {
@@ -980,6 +993,19 @@ public class LingleUI extends JFrame {
                 return;
             }
             PackageInstaller.installPackages(selected, this);
+        });
+
+        debounceButton.addActionListener(e -> {
+            try {
+                DebounceInstaller.installDebounceScript();
+                showDarkMessage(this, "Success", "Debounce time decreased successfully.\n\nYou must restart your system for changes to take effect.\n\nThis is a one-time configuration.");
+            } catch (Exception ex) {
+                showDarkMessage(this, "Error", "Failed to decrease debounce time:\n" + ex.getMessage());
+            }
+        });
+
+        configurePrismButton.addActionListener(e -> {
+            showConfigurePrismDialog();
         });
 
         JPanel supportPanel = new JPanel();
@@ -1011,11 +1037,11 @@ public class LingleUI extends JFrame {
         contentPanel.add(settingsPanel, "Utilities");
         contentPanel.add(installerPanel, "Installer");
         contentPanel.add(tmpfsPanel, "auToMPFS");
-        contentPanel.add(supportPanel, "Help-Support");
+        contentPanel.add(supportPanel, "Support");
         settingsNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Utilities"));
         installerNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Installer"));
         tmpfsNavButton.addActionListener(e -> cardLayout.show(contentPanel, "auToMPFS"));
-        supportNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Help-Support"));
+        supportNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Support"));
         cardLayout.show(contentPanel, "Utilities");
 
         // ===== Frame =====
@@ -1553,6 +1579,112 @@ public class LingleUI extends JFrame {
         dlg.setSize(600, 500);
         dlg.setLocationRelativeTo(this);
         dlg.setVisible(true);
+    }
+
+    private void showConfigurePrismDialog() {
+        Path instancesDir = Path.of(System.getProperty("user.home"), ".local/share/PrismLauncher/instances");
+        if (!Files.exists(instancesDir)) {
+            showDarkMessage(this, "Error", "Prism instances directory not found");
+            return;
+        }
+
+        JDialog dlg = new JDialog(this, "Configure Prism Settings", true);
+        JPanel body = new JPanel(new BorderLayout(10, 10));
+        body.setBackground(BG);
+        body.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
+        JLabel instructionLabel = new JLabel("Select instances to configure:");
+        instructionLabel.setForeground(TXT);
+        instructionLabel.setFont(UI_FONT_BOLD);
+        instructionLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JPanel checkPanel = new JPanel();
+        checkPanel.setLayout(new BoxLayout(checkPanel, BoxLayout.Y_AXIS));
+        checkPanel.setBackground(BG);
+
+        List<JCheckBox> instanceCheckboxes = new ArrayList<>();
+        try {
+            for (Path dir : Files.list(instancesDir).filter(Files::isDirectory)
+                    .filter(p -> !p.getFileName().toString().equals(".tmp"))
+                    .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase())).toList()) {
+                JCheckBox cb = createStyledCheckBox(dir.getFileName().toString());
+                instanceCheckboxes.add(cb);
+                checkPanel.add(cb);
+            }
+        } catch (IOException ex) {
+            showDarkMessage(this, "Error", "Failed to read instances: " + ex.getMessage());
+            return;
+        }
+
+        JScrollPane instanceScroll = makeScroll(checkPanel);
+        instanceScroll.setPreferredSize(new Dimension(400, 300));
+
+        JPanel topPanel = new JPanel(new BorderLayout(5, 10));
+        topPanel.setBackground(BG);
+        topPanel.add(instructionLabel, BorderLayout.NORTH);
+        topPanel.add(instanceScroll, BorderLayout.CENTER);
+
+        body.add(topPanel, BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.setBackground(BG);
+        JButton configureBtn = makeButton("Configure Settings", 160);
+        JButton cancelBtn = makeButton("Cancel", 100);
+        btnPanel.add(cancelBtn);
+        btnPanel.add(configureBtn);
+        body.add(btnPanel, BorderLayout.SOUTH);
+
+        configureBtn.addActionListener(ev -> {
+            List<String> selectedInstances = new ArrayList<>();
+            for (JCheckBox cb : instanceCheckboxes) {
+                if (cb.isSelected()) selectedInstances.add(cb.getText());
+            }
+
+            if (selectedInstances.isEmpty()) {
+                showDarkMessage(this, "Error", "Please select at least one instance");
+                return;
+            }
+
+            try {
+                String pkgManager = DistroDetector.getPackageManager();
+                if (pkgManager == null) {
+                    showDarkMessage(this, "Error", "Could not detect package manager");
+                    return;
+                }
+
+                // Check if NVIDIA GPU is present
+                boolean hasNvidiaGPU = detectNvidiaGPU();
+
+                PrismConfigEditor.configureInstances(selectedInstances, pkgManager, hasNvidiaGPU);
+                dlg.dispose();
+                showDarkMessage(this, "Success", "Configured " + selectedInstances.size() + " instance(s) successfully");
+            } catch (Exception ex) {
+                showDarkMessage(this, "Error", "Failed to configure instances:\n" + ex.getMessage());
+            }
+        });
+
+        cancelBtn.addActionListener(ev -> dlg.dispose());
+
+        dlg.setContentPane(body);
+        dlg.setSize(500, 450);
+        dlg.setLocationRelativeTo(this);
+        dlg.setVisible(true);
+    }
+
+    private boolean detectNvidiaGPU() {
+        try {
+            Process p = new ProcessBuilder("lspci").start();
+            try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.toLowerCase().contains("nvidia") && line.toLowerCase().contains("vga")) {
+                        return true;
+                    }
+                }
+            }
+            p.waitFor();
+        } catch (Exception ignored) {}
+        return false;
     }
 
     // Helper class for remap row

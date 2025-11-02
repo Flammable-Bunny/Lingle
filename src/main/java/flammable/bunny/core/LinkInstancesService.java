@@ -96,42 +96,55 @@ public class LinkInstancesService {
                 Files.setPosixFilePermissions(script, perms);
             } catch (UnsupportedOperationException ignored) {}
 
-            String user = System.getProperty("user.name");
-            String homeStr = home.toString();
-
+            // Create user service instead of system service for better KDE compatibility
             String service = """
                     [Unit]
-                    Description=Lingle Practice Map Linker (System)
-                    After=network-online.target
-                    Wants=network-online.target
+                    Description=Lingle Practice Map Linker
+                    After=graphical-session.target
 
                     [Service]
                     Type=oneshot
-                    User=%s
-                    Environment=HOME=%s
                     ExecStart=%s
                     RemainAfterExit=yes
 
                     [Install]
-                    WantedBy=multi-user.target
-                    """.formatted(user, homeStr, script.toString());
+                    WantedBy=default.target
+                    """.formatted(script.toString());
 
-            Path tmpService = Files.createTempFile("lingle-startup", ".service");
-            Files.writeString(tmpService, service, StandardCharsets.UTF_8);
+            Path userServiceDir = home.resolve(".config/systemd/user");
+            Files.createDirectories(userServiceDir);
+            Path serviceFile = userServiceDir.resolve("lingle-startup.service");
+            Files.writeString(serviceFile, service, StandardCharsets.UTF_8);
 
-            String installCmd = String.join(" && ",
-                    "install -D -m 0644 '" + tmpService + "' /etc/systemd/system/lingle-startup.service",
-                    "systemctl daemon-reload",
-                    "systemctl enable --now lingle-startup.service"
-            );
+            // Enable and start user service (no root required)
+            ProcessBuilder pb = new ProcessBuilder("systemctl", "--user", "daemon-reload");
+            pb.redirectErrorStream(true);
+            Process reloadProc = pb.start();
+            reloadProc.waitFor();
 
-            int ec = ElevatedInstaller.runElevatedBash(installCmd);
+            pb = new ProcessBuilder("systemctl", "--user", "enable", "--now", "lingle-startup.service");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+
+            // Capture output for debugging
+            StringBuilder output = new StringBuilder();
+            try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+            int ec = p.waitFor();
 
             if (ec == 0) {
-                UIUtils.showDarkMessage(parent, "Success", "System service installed and enabled.");
+                UIUtils.showDarkMessage(parent, "Success", "Startup service installed and enabled.\n" +
+                        "Directories will be created automatically on login.");
             } else {
-                UIUtils.showDarkMessage(parent, "Error", "Failed to install/start service (exit " + ec + ").\n" +
-                        "Ensure a polkit authentication agent is running.");
+                String errorMsg = "Failed to install/start service (exit " + ec + ")";
+                if (output.length() > 0) {
+                    errorMsg += "\n" + output.toString().trim();
+                }
+                UIUtils.showDarkMessage(parent, "Error", errorMsg);
             }
 
         } catch (Exception e) {
