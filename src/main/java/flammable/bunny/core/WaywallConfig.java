@@ -11,116 +11,183 @@ import java.util.regex.Pattern;
 
 public class WaywallConfig {
     private static final Path CONFIG_DIR = Path.of(System.getProperty("user.home"), ".config", "waywall");
-    private static final Path TOGGLES = CONFIG_DIR.resolve("toggles.lua");
-    private static final Path PATHS = CONFIG_DIR.resolve("paths.lua");
-    private static final Path KEYBINDS = CONFIG_DIR.resolve("keybinds.lua");
-    private static final Path REMAPS = CONFIG_DIR.resolve("remaps.lua");
+    private static final Path CONFIG_LUA = CONFIG_DIR.resolve("config.lua");
+    private static final Path INIT_LUA = CONFIG_DIR.resolve("init.lua");
+    private static final Path REMAPS_LUA = CONFIG_DIR.resolve("remaps.lua");
 
-    private static Pattern togglePattern(String key) {
-        return Pattern.compile("(?m)^(\\s*" + Pattern.quote(key) + "\\s*=\\s*)(true|false)(\\s*,?\\s*)$");
-    }
+    // ==================== TOGGLE METHODS ====================
 
-    private static Pattern pathVarPattern(String varName) {
-        return Pattern.compile("(?m)^(\\s*" + Pattern.quote(varName) + "\\s*=\\s*home\\s*\\.\\.\\s*\")([^\"]*)(\"\\s*,?\\s*)$");
-    }
-
-    private static final Pattern BG_PATH_TOGGLED = Pattern.compile(
-            "(?m)^\\s*bg_path\\s*=\\s*toggles\\.toggle_bg_picture\\s*and\\s*\\(\\s*home\\s*\\.\\.\\s*\"([^\"]*)\"\\s*\\)\\s*or\\s*nil\\s*,?\\s*$");
-
+    /**
+     * Get a boolean toggle from config.lua
+     */
     public static boolean getToggle(String key, boolean def) {
         try {
-            if (!Files.exists(TOGGLES)) return def;
-            String s = Files.readString(TOGGLES);
-            Matcher m = togglePattern(key).matcher(s);
+            if (!Files.exists(CONFIG_LUA)) return def;
+            String s = Files.readString(CONFIG_LUA);
+            Pattern p = Pattern.compile("(?m)^\\s*local\\s+" + Pattern.quote(key) + "\\s*=\\s*(true|false)");
+            Matcher m = p.matcher(s);
             if (m.find()) {
-                return Boolean.parseBoolean(m.group(2));
+                return Boolean.parseBoolean(m.group(1));
             }
         } catch (IOException ignored) {}
         return def;
     }
 
+    /**
+     * Set a boolean toggle in config.lua
+     */
     public static void setToggle(String key, boolean value) throws IOException {
         Files.createDirectories(CONFIG_DIR);
-        String content = Files.exists(TOGGLES) ? Files.readString(TOGGLES) : "";
-        Matcher m = togglePattern(key).matcher(content);
-        String replacement = "$1" + (value ? "true" : "false") + "$3";
+        String content = Files.exists(CONFIG_LUA) ? Files.readString(CONFIG_LUA) : "";
+
+        Pattern p = Pattern.compile("(?m)^(\\s*local\\s+" + Pattern.quote(key) + "\\s*=\\s*)(true|false)");
+        Matcher m = p.matcher(content);
+
         String updated;
         if (m.find()) {
-            updated = m.replaceAll(replacement);
+            updated = m.replaceAll("$1" + (value ? "true" : "false"));
         } else {
-            String line = key + " = " + (value ? "true" : "false") + ",\n";
-            updated = content + (content.endsWith("\n") ? "" : "\n") + line;
+            // Add new toggle at the top of the file
+            updated = "local " + key + " = " + (value ? "true" : "false") + "\n" + content;
         }
-        Files.writeString(TOGGLES, updated, StandardCharsets.UTF_8);
+
+        // Special handling for res_1440 - update mirror positions
+        if ("res_1440".equals(key) && value) {
+            updated = update1440pMirrorPositions(updated);
+        }
+
+        Files.writeString(CONFIG_LUA, updated, StandardCharsets.UTF_8);
     }
 
+    /**
+     * Update mirror positions for 1440p resolution
+     */
+    private static String update1440pMirrorPositions(String content) {
+        // Update e_count
+        content = updateLuaTable(content, "e_count",
+            Map.of("x", "1500", "y", "400", "size", "5", "colorkey", "false"));
+
+        // Update thin_pie
+        content = updateLuaTable(content, "thin_pie",
+            Map.of("x", "1490", "y", "645", "size", "4", "colorkey", "false"));
+
+        // Update thin_percent
+        content = updateLuaTable(content, "thin_percent",
+            Map.of("enabled", "false", "x", "1568", "y", "1050", "size", "6"));
+
+        // Update tall_pie
+        content = updateLuaTable(content, "tall_pie",
+            Map.of("x", "1490", "y", "645", "size", "4", "colorkey", "false"));
+
+        // Update tall_percent
+        content = updateLuaTable(content, "tall_percent",
+            Map.of("enabled", "false", "x", "1568", "y", "1050", "size", "6"));
+
+        return content;
+    }
+
+    /**
+     * Update a Lua table with new values
+     */
+    private static String updateLuaTable(String content, String tableName, Map<String, String> values) {
+        // Find the table definition
+        Pattern tablePattern = Pattern.compile(
+            "(?m)^(\\s*local\\s+" + Pattern.quote(tableName) + "\\s*=\\s*\\{)([^}]+)(\\})",
+            Pattern.DOTALL
+        );
+        Matcher m = tablePattern.matcher(content);
+
+        if (m.find()) {
+            String prefix = m.group(1);
+            String tableContent = m.group(2);
+            String suffix = m.group(3);
+
+            // Update each value in the table
+            for (Map.Entry<String, String> entry : values.entrySet()) {
+                String key = entry.getKey();
+                String value = entry.getValue();
+
+                Pattern keyPattern = Pattern.compile(
+                    "(" + Pattern.quote(key) + "\\s*=\\s*)([^,\\s]+)"
+                );
+                Matcher keyMatcher = keyPattern.matcher(tableContent);
+
+                if (keyMatcher.find()) {
+                    tableContent = keyMatcher.replaceAll("$1" + value);
+                }
+            }
+
+            String replacement = prefix + tableContent + suffix;
+            return m.replaceFirst(Matcher.quoteReplacement(replacement));
+        }
+
+        return content;
+    }
+
+    // ==================== PATH METHODS ====================
+
+    /**
+     * Read paths from init.lua
+     */
     public static Map<String, String> readPaths() {
         Map<String, String> out = new HashMap<>();
         try {
-            if (!Files.exists(PATHS)) return out;
-            String s = Files.readString(PATHS);
-            for (String var : new String[]{"pacem_path", "nb_path", "overlay_path", "lingle_path"}) {
-                Matcher m = pathVarPattern(var).matcher(s);
-                if (m.find()) out.put(var, m.group(2));
-            }
-            Matcher bg = BG_PATH_TOGGLED.matcher(s);
-            if (bg.find()) {
-                out.put("bg_path", bg.group(1));
+            if (!Files.exists(INIT_LUA)) return out;
+            String s = Files.readString(INIT_LUA);
+
+            // Look for path assignments in init.lua
+            Pattern pathPattern = Pattern.compile(
+                "(?m)^\\s*local\\s+(pacem_path|nb_path|overlay_path|bg_path|stretched_overlay_path|tall_overlay_path|thin_overlay_path|wide_overlay_path)\\s*=\\s*waywall_config_path\\s*\\.\\.\\s*\"resources/([^\"]+)\""
+            );
+            Matcher m = pathPattern.matcher(s);
+
+            while (m.find()) {
+                String varName = m.group(1);
+                String filename = m.group(2);
+                out.put(varName, "/resources/" + filename);
             }
         } catch (IOException ignored) {}
         return out;
     }
 
+    /**
+     * Set a path variable in init.lua
+     */
     public static void setPathVar(String varName, String homeRelative) throws IOException {
         Files.createDirectories(CONFIG_DIR);
-        String content = Files.exists(PATHS) ? Files.readString(PATHS) : "";
+        String content = Files.exists(INIT_LUA) ? Files.readString(INIT_LUA) : "";
 
-        if ("bg_path".equals(varName)) {
-            String toggledLine = "bg_path = toggles.toggle_bg_picture and (home .. \"" + homeRelative + "\") or nil,";
-            String updated;
-            Matcher mBg = BG_PATH_TOGGLED.matcher(content);
-            if (mBg.find()) {
-                updated = mBg.replaceAll(Matcher.quoteReplacement(toggledLine));
-            } else {
-                Matcher any = Pattern.compile("(?m)^\\s*bg_path\\s*=.*$").matcher(content);
-                if (any.find()) {
-                    updated = any.replaceAll(Matcher.quoteReplacement(toggledLine));
-                } else {
-                    updated = content + (content.endsWith("\n") ? "" : "\n") + toggledLine + "\n";
-                }
-            }
-            Files.writeString(PATHS, updated, StandardCharsets.UTF_8);
-            return;
-        }
+        // Extract just the filename from the path
+        String filename = homeRelative;
+        if (filename.startsWith("/")) filename = filename.substring(1);
 
-        Matcher m = pathVarPattern(varName).matcher(content);
+        // Pattern to match the path assignment in init.lua
+        Pattern p = Pattern.compile(
+            "(?m)^(\\s*local\\s+" + Pattern.quote(varName) + "\\s*=\\s*waywall_config_path\\s*\\.\\.\\s*\"resources/)([^\"]+)(\")"
+        );
+        Matcher m = p.matcher(content);
+
         String updated;
         if (m.find()) {
-            String replacement = "$1" + Matcher.quoteReplacement(homeRelative) + "$3";
-            updated = m.replaceAll(replacement);
+            updated = m.replaceAll("$1" + Matcher.quoteReplacement(filename) + "$3");
         } else {
-            String cleanLine = varName + " = home .. \"" + homeRelative + "\",";
-            Matcher anyAssign = Pattern.compile("(?m)^\\s*" + Pattern.quote(varName) + "\\s*=.*$").matcher(content);
-            if (anyAssign.find()) {
-                updated = anyAssign.replaceAll(Matcher.quoteReplacement(cleanLine));
+            // Add new path assignment
+            Pattern sectionEnd = Pattern.compile("(?m)^(local keyboard_remaps = require)");
+            Matcher sectionMatcher = sectionEnd.matcher(content);
+            if (sectionMatcher.find()) {
+                String newLine = "local " + varName + " = waywall_config_path .. \"resources/" + filename + "\"\n";
+                updated = sectionMatcher.replaceFirst(newLine + "$1");
             } else {
-                String placeholderToken = switch (varName) {
-                    case "pacem_path" -> "pacemanpathplaceholder";
-                    case "nb_path" -> "ninjabrainbotpathplaceholder";
-                    case "overlay_path" -> "measuringoverlaypathplaceholder";
-                    case "lingle_path" -> "linglepathplaceholder";
-                    default -> null;
-                };
-                if (placeholderToken != null && content.contains(placeholderToken)) {
-                    updated = content.replace(placeholderToken, homeRelative);
-                } else {
-                    updated = content + (content.endsWith("\n") ? "" : "\n") + cleanLine + "\n";
-                }
+                updated = content + "\nlocal " + varName + " = waywall_config_path .. \"resources/" + filename + "\"\n";
             }
         }
-        Files.writeString(PATHS, updated, StandardCharsets.UTF_8);
+
+        Files.writeString(INIT_LUA, updated, StandardCharsets.UTF_8);
     }
 
+    /**
+     * Convert absolute path to home-relative format
+     */
     public static String toHomeRelative(Path absolute) {
         Path home = Path.of(System.getProperty("user.home"));
         Path norm = absolute.toAbsolutePath().normalize();
@@ -131,108 +198,135 @@ public class WaywallConfig {
         return norm.toString();
     }
 
-    public static void setKeybindPlaceholder(String placeholderToken, String keybind) throws IOException {
-        Files.createDirectories(CONFIG_DIR);
-        String content = Files.exists(KEYBINDS) ? Files.readString(KEYBINDS) : "";
-        Pattern quotedToken = Pattern.compile("(?m)(\")" + Pattern.quote(placeholderToken) + "(\")");
-        Matcher m = quotedToken.matcher(content);
-        String updated = m.replaceAll("$1" + Matcher.quoteReplacement(keybind) + "$2");
-        if (updated.equals(content)) {
-            Pattern linePattern = Pattern.compile("(?m)^(\\s*[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*\")" + Pattern.quote(placeholderToken) + "\"(\\s*,?\\s*)$");
-            Matcher m2 = linePattern.matcher(content);
-            updated = m2.replaceAll("$1" + Matcher.quoteReplacement(keybind) + "\"$2");
-        }
-        if (updated.equals(content)) {
-            updated = content + (content.endsWith("\n") ? "" : "\n") + "-- " + placeholderToken + " = '" + keybind + "'\n";
-        }
-        Files.writeString(KEYBINDS, updated, StandardCharsets.UTF_8);
-    }
+    // ==================== KEYBIND METHODS ====================
 
-
+    /**
+     * Set a keybind variable in config.lua
+     */
     public static void setKeybindVar(String varName, String value, boolean withStar, boolean isPlaceholder) throws IOException {
         Files.createDirectories(CONFIG_DIR);
-        String content = Files.exists(KEYBINDS) ? Files.readString(KEYBINDS) : "";
+        String content = Files.exists(CONFIG_LUA) ? Files.readString(CONFIG_LUA) : "";
+
         String inner = (withStar ? "*-" : "") + value;
-        String line = varName + " = \"" + inner + "\",";
-        Pattern varLine = Pattern.compile("(?m)^(\\s*" + Pattern.quote(varName) + "\\s*=\\s*\")(.*?)(\"\\s*,?\\s*)$");
-        Matcher m = varLine.matcher(content);
-        String updated;
-        if (m.find()) {
-            updated = m.replaceAll("$1" + Matcher.quoteReplacement(inner) + "$3");
+
+        // Handle table-based keybinds (thin, wide, tall)
+        if (varName.equals("thin_key") || varName.equals("wide_key") || varName.equals("tall_key")) {
+            String tableName = varName.replace("_key", "");
+            Pattern tablePattern = Pattern.compile(
+                "(?m)^(\\s*local\\s+" + Pattern.quote(tableName) + "\\s*=\\s*\\{\\s*key\\s*=\\s*\")([^\"]+)(\")",
+                Pattern.DOTALL
+            );
+            Matcher m = tablePattern.matcher(content);
+
+            if (m.find()) {
+                content = m.replaceAll("$1" + Matcher.quoteReplacement(inner) + "$3");
+            }
         } else {
-            updated = content + (content.endsWith("\n") ? "" : "\n") + line + "\n";
+            // Handle simple keybind variables
+            Pattern p = Pattern.compile("(?m)^(\\s*local\\s+" + Pattern.quote(varName) + "\\s*=\\s*\")([^\"]+)(\")");
+            Matcher m = p.matcher(content);
+
+            if (m.find()) {
+                content = m.replaceAll("$1" + Matcher.quoteReplacement(inner) + "$3");
+            } else {
+                // Add new keybind
+                content = content + "\nlocal " + varName + " = \"" + inner + "\"\n";
+            }
         }
-        Files.writeString(KEYBINDS, updated, StandardCharsets.UTF_8);
+
+        Files.writeString(CONFIG_LUA, content, StandardCharsets.UTF_8);
     }
 
-
+    /**
+     * Read keybinds from config.lua
+     */
     public static void readKeybindsFromFile() throws IOException {
-        if (!Files.exists(KEYBINDS)) {
-            throw new IOException("Existing Config file not found: " + KEYBINDS);
+        if (!Files.exists(CONFIG_LUA)) {
+            throw new IOException("Config file not found: " + CONFIG_LUA);
         }
 
-        String content = Files.readString(KEYBINDS);
+        String content = Files.readString(CONFIG_LUA);
 
-        Pattern localVarPattern = Pattern.compile("(?m)^\\s*local\\s+(\\w+)\\s*=\\s*\"?([^\"\\n]+?)\"?\\s*,?\\s*$");
-        Matcher m = localVarPattern.matcher(content);
+        // Pattern for table-based keybinds (thin, wide, tall)
+        Pattern tablePattern = Pattern.compile("(?m)^\\s*local\\s+(thin|wide|tall)\\s*=\\s*\\{\\s*key\\s*=\\s*\"([^\"]+)\"");
+        Matcher tableMatcher = tablePattern.matcher(content);
 
-        while (m.find()) {
-            String varName = m.group(1).toLowerCase();
-            String value = m.group(2).trim();
+        while (tableMatcher.find()) {
+            String name = tableMatcher.group(1);
+            String value = tableMatcher.group(2);
 
             if (value.startsWith("*-")) value = value.substring(2);
             if (value.toLowerCase().contains("placeholder") || value.isBlank()) continue;
 
-            if (varName.contains("thin")) LingleState.setSetKeybind("Thin_Key", value);
-            else if (varName.contains("wide")) LingleState.setSetKeybind("Wide_Key", value);
-            else if (varName.contains("tall")) LingleState.setSetKeybind("Tall_Key", value);
-            else if (varName.contains("ninbot") || varName.contains("nbb") || varName.contains("show"))
-                LingleState.setSetKeybind("NBB_Key", value);
-            else if (varName.contains("fullscreen")) LingleState.setSetKeybind("Fullscreen_Key", value);
-            else if ((varName.contains("open") || varName.contains("apps")) && !varName.contains("remap"))
-                LingleState.setSetKeybind("Apps_Key", value);
-            else if (varName.contains("remap")) LingleState.setSetKeybind("Remaps_Key", value);
+            if (name.equals("thin")) LingleState.setSetKeybind("Thin_Key", value);
+            else if (name.equals("wide")) LingleState.setSetKeybind("Wide_Key", value);
+            else if (name.equals("tall")) LingleState.setSetKeybind("Tall_Key", value);
+        }
+
+        // Pattern for simple keybind variables
+        Pattern simplePattern = Pattern.compile("(?m)^\\s*local\\s+(launch_paceman_key|toggle_fullscreen_key|toggle_ninbot_key|toggle_remaps_key)\\s*=\\s*\"([^\"]+)\"");
+        Matcher simpleMatcher = simplePattern.matcher(content);
+
+        while (simpleMatcher.find()) {
+            String varName = simpleMatcher.group(1);
+            String value = simpleMatcher.group(2);
+
+            if (value.startsWith("*-")) value = value.substring(2);
+            if (value.toLowerCase().contains("placeholder") || value.isBlank()) continue;
+
+            if (varName.equals("toggle_ninbot_key")) LingleState.setSetKeybind("NBB_Key", value);
+            else if (varName.equals("toggle_fullscreen_key")) LingleState.setSetKeybind("Fullscreen_Key", value);
+            else if (varName.equals("launch_paceman_key")) LingleState.setSetKeybind("Apps_Key", value);
+            else if (varName.equals("toggle_remaps_key")) LingleState.setSetKeybind("Remaps_Key", value);
         }
     }
 
+    // ==================== REMAPS METHODS ====================
+
+    /**
+     * Write remaps to remaps.lua
+     */
     public static void writeRemapsFile(java.util.List<Remaps> remaps) throws IOException {
         Files.createDirectories(CONFIG_DIR);
 
         StringBuilder sb = new StringBuilder();
         sb.append("return {\n");
-        sb.append("remapped_kb = {\n");
+        sb.append("\tremapped_kb = {\n");
+        sb.append("\t\t-- Add any playing remaps here\n");
 
         // Permanent remaps (always active)
         for (Remaps remap : remaps) {
             if (remap.isPermanent && !remap.fromKey.isEmpty() && !remap.toKey.isEmpty()) {
-                sb.append("\t[\"").append(remap.fromKey).append("\"] = \"").append(remap.toKey).append("\",\n");
+                sb.append("\t\t[\"").append(remap.fromKey).append("\"] = \"").append(remap.toKey).append("\",\n");
             }
         }
 
-        sb.append("\t-- remaps_placeholder\n");
-        sb.append("},\n\n");
-        sb.append("normal_kb = {\n");
+        sb.append("\n\t},\n\n");
+        sb.append("\tnormal_kb = {\n");
+        sb.append("\t\t-- Add any remaps you want to keep when disabling normal remaps (not necessary)\n");
 
         // Normal remaps (toggleable)
         for (Remaps remap : remaps) {
             if (!remap.isPermanent && !remap.fromKey.isEmpty() && !remap.toKey.isEmpty()) {
-                sb.append("\t[\"").append(remap.fromKey).append("\"] = \"").append(remap.toKey).append("\",\n");
+                sb.append("\t\t[\"").append(remap.fromKey).append("\"] = \"").append(remap.toKey).append("\",\n");
             }
         }
 
-        sb.append("\t--disabled_placeholder\n");
-        sb.append("\n},\n\n");
+        sb.append("\n\t},\n\n");
         sb.append("}\n");
 
-        Files.writeString(REMAPS, sb.toString(), StandardCharsets.UTF_8);
+        Files.writeString(REMAPS_LUA, sb.toString(), StandardCharsets.UTF_8);
     }
 
+    /**
+     * Read remaps from remaps.lua
+     */
     public static java.util.List<Remaps> readRemapsFile() {
         java.util.List<Remaps> remaps = new java.util.ArrayList<>();
         try {
-            if (!Files.exists(REMAPS)) return remaps;
+            if (!Files.exists(REMAPS_LUA)) return remaps;
 
-            String content = Files.readString(REMAPS);
+            String content = Files.readString(REMAPS_LUA);
 
             // Parse remapped_kb (permanent)
             Pattern remappedKbSection = Pattern.compile("remapped_kb\\s*=\\s*\\{([^}]+)\\}", Pattern.DOTALL);
@@ -266,9 +360,18 @@ public class WaywallConfig {
         return remaps;
     }
 
+    // ==================== GETTERS ====================
+
     public static Path getConfigDir() { return CONFIG_DIR; }
-    public static Path getTogglesFile() { return TOGGLES; }
-    public static Path getPathsFile() { return PATHS; }
-    public static Path getKeybindsFile() { return KEYBINDS; }
-    public static Path getRemapsFile() { return REMAPS; }
+    public static Path getConfigFile() { return CONFIG_LUA; }
+    public static Path getInitFile() { return INIT_LUA; }
+    public static Path getRemapsFile() { return REMAPS_LUA; }
+
+    // Legacy compatibility
+    @Deprecated
+    public static Path getTogglesFile() { return CONFIG_LUA; }
+    @Deprecated
+    public static Path getPathsFile() { return INIT_LUA; }
+    @Deprecated
+    public static Path getKeybindsFile() { return CONFIG_LUA; }
 }

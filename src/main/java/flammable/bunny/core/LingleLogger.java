@@ -76,16 +76,19 @@ public class LingleLogger {
     }
 
     public static void registerListener(JTextArea textArea) {
-        synchronized (listeners) {
-            listeners.add(textArea);
-        }
-        
-        // Add existing logs to the new listener
+        // Add existing logs to the new listener BEFORE adding to listeners list
+        // This prevents double printing
         SwingUtilities.invokeLater(() -> {
             synchronized (logEntries) {
                 for (String entry : logEntries) {
                     textArea.append(entry + "\n");
                 }
+                textArea.setCaretPosition(textArea.getDocument().getLength());
+            }
+
+            // Only add to listeners AFTER replay is complete
+            synchronized (listeners) {
+                listeners.add(textArea);
             }
         });
     }

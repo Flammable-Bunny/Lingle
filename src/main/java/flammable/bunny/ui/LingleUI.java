@@ -949,20 +949,40 @@ public class LingleUI extends JFrame {
                 int ec;
                 try {
                     Path script = PackagesforRunSubmissionZipper.install(outDir);
-                    Process p = new ProcessBuilder("python3", script.toString(), outDir.toString())
-                            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                            .redirectError(ProcessBuilder.Redirect.DISCARD)
-                            .start();
+                    logCommand("python3 " + script + " " + outDir);
+                    Process p = new ProcessBuilder("python3", script.toString(), outDir.toString()).start();
+
+                    // Log stdout
+                    try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                            new java.io.InputStreamReader(p.getInputStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            logOutput(line);
+                        }
+                    }
+                    // Log stderr
+                    try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                            new java.io.InputStreamReader(p.getErrorStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            logOutput(line);
+                        }
+                    }
+
                     ec = p.waitFor();
+                    logInfo("Python script exited with code: " + ec);
                 } catch (Exception ex) {
+                    logError("Package creation failed", ex);
                     ec = 1;
                 }
                 final int exitCode = ec;
                 SwingUtilities.invokeLater(() -> {
                     progress.dispose();
                     if (exitCode == 0) {
+                        logSuccess("Package created successfully in: " + outDir);
                         showDarkMessage(this, "Done", "Package created in:\n" + outDir);
                     } else {
+                        logError("Packaging failed with exit code: " + exitCode);
                         showDarkMessage(this, "Error Code 14", "Packaging failed.");
                     }
                 });
@@ -1276,6 +1296,24 @@ public class LingleUI extends JFrame {
                     throw new IOException("Script not found: " + script);
                 }
                 Process p = new ProcessBuilder("/bin/bash", script.toString()).start();
+
+                // Log all output from the script
+                try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(p.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        logOutput(line);
+                    }
+                }
+                // Log all error output from the script
+                try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(p.getErrorStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        logOutput(line);
+                    }
+                }
+
                 exitCode = p.waitFor();
                 logInfo("Script execution completed with exit code: " + exitCode);
             } catch (Exception ex) {
@@ -1860,17 +1898,23 @@ public class LingleUI extends JFrame {
 
     private boolean detectNvidiaGPU() {
         try {
+            logCommand("lspci");
             Process p = new ProcessBuilder("lspci").start();
+            boolean found = false;
             try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
+                    logOutput(line);
                     if (line.toLowerCase().contains("nvidia") && line.toLowerCase().contains("vga")) {
-                        return true;
+                        found = true;
                     }
                 }
             }
             p.waitFor();
-        } catch (Exception ignored) {}
+            return found;
+        } catch (Exception e) {
+            logError("Failed to detect NVIDIA GPU", e);
+        }
         return false;
     }
 
