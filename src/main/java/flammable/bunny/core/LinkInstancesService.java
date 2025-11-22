@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
@@ -34,6 +35,7 @@ public class LinkInstancesService {
             catch (FileAlreadyExistsException ignored) {}
         }
         LingleState.instanceCount = instanceNames.size();
+        LingleState.linkedInstances = new ArrayList<>(instanceNames);
         LingleState.saveState();
     }
 
@@ -77,15 +79,18 @@ public class LinkInstancesService {
 
     public static void installCreateDirsService(JFrame parent) {
         try {
+            LingleLogger.logInfo("Installing Lingle startup service...");
             preparePracticeMapLinks();
 
             Path home = Path.of(System.getProperty("user.home"));
             Path scriptsDir = home.resolve(".local/share/lingle/scripts");
             Path script = scriptsDir.resolve("link_practice_maps.sh");
             if (!Files.exists(script)) {
+                LingleLogger.logError("Script not found: " + script);
                 UIUtils.showDarkMessage(parent, "Error", "Missing script: " + script);
                 return;
             }
+            LingleLogger.logInfo("Found script: " + script);
 
             try {
                 Set<PosixFilePermission> perms = EnumSet.of(
@@ -96,59 +101,188 @@ public class LinkInstancesService {
                 Files.setPosixFilePermissions(script, perms);
             } catch (UnsupportedOperationException ignored) {}
 
-            // Create user service instead of system service for better KDE compatibility
+            // Create system service in /etc/systemd/system/ for reliability
+            String username = System.getProperty("user.name");
             String service = """
                     [Unit]
                     Description=Lingle Practice Map Linker
-                    After=graphical-session.target
+                    After=multi-user.target
 
                     [Service]
                     Type=oneshot
+                    User=%s
                     ExecStart=%s
                     RemainAfterExit=yes
 
                     [Install]
-                    WantedBy=default.target
-                    """.formatted(script.toString());
+                    WantedBy=multi-user.target
+                    """.formatted(username, script.toString());
 
-            Path userServiceDir = home.resolve(".config/systemd/user");
-            Files.createDirectories(userServiceDir);
-            Path serviceFile = userServiceDir.resolve("lingle-startup.service");
-            Files.writeString(serviceFile, service, StandardCharsets.UTF_8);
+            // Write service file to /etc/systemd/system/ using elevated privileges
+            String serviceFilePath = "/etc/systemd/system/lingle-startup.service";
+            String createServiceCmd = String.format(
+                    "cat > %s << 'EOF'\n%sEOF\n",
+                    serviceFilePath,
+                    service
+            );
 
-            // Enable and start user service (no root required)
-            ProcessBuilder pb = new ProcessBuilder("systemctl", "--user", "daemon-reload");
-            pb.redirectErrorStream(true);
-            Process reloadProc = pb.start();
-            reloadProc.waitFor();
-
-            pb = new ProcessBuilder("systemctl", "--user", "enable", "--now", "lingle-startup.service");
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-
-            // Capture output for debugging
-            StringBuilder output = new StringBuilder();
-            try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
+            LingleLogger.logInfo("Creating system service at " + serviceFilePath);
+            LingleLogger.logCommand(createServiceCmd);
+            int writeExitCode = ElevatedInstaller.runElevatedBash(createServiceCmd);
+            if (writeExitCode != 0) {
+                LingleLogger.logError("Failed to create service file, exit code: " + writeExitCode);
+                UIUtils.showDarkMessage(parent, "Error", "Failed to create service file (exit code: " + writeExitCode + ")");
+                return;
             }
-            int ec = p.waitFor();
+            LingleLogger.logSuccess("Service file created at " + serviceFilePath);
+
+            // Reload systemd daemon and enable service using elevated privileges
+            LingleLogger.logInfo("Reloading systemd daemon");
+            int reloadExitCode = ElevatedInstaller.runElevatedBash("systemctl daemon-reload");
+            if (reloadExitCode != 0) {
+                LingleLogger.logError("Failed to reload systemd daemon, exit code: " + reloadExitCode);
+                UIUtils.showDarkMessage(parent, "Error", "Failed to reload systemd daemon (exit code: " + reloadExitCode + ")");
+                return;
+            }
+            LingleLogger.logSuccess("Systemd daemon reloaded");
+
+            LingleLogger.logInfo("Enabling and starting lingle-startup.service");
+            int ec = ElevatedInstaller.runElevatedBash("systemctl enable --now lingle-startup.service");
 
             if (ec == 0) {
+                LingleLogger.logSuccess("Lingle startup service installed and enabled");
                 UIUtils.showDarkMessage(parent, "Success", "Startup service installed and enabled.\n" +
                         "Directories will be created automatically on login.");
             } else {
-                String errorMsg = "Failed to install/start service (exit " + ec + ")";
-                if (output.length() > 0) {
-                    errorMsg += "\n" + output.toString().trim();
-                }
-                UIUtils.showDarkMessage(parent, "Error", errorMsg);
+                LingleLogger.logError("Failed to enable/start service, exit code: " + ec);
+                UIUtils.showDarkMessage(parent, "Error", "Failed to install/start service (exit code: " + ec + ")");
             }
 
         } catch (Exception e) {
+            LingleLogger.logError("Failed to install startup service", e);
             UIUtils.showDarkMessage(parent, "Error", e.getClass().getSimpleName() + ": " + e.getMessage());
         }
+    }
+
+    public static void removeInstanceLinks(List<String> instancesToRemove) throws IOException {
+        if (instancesToRemove.isEmpty()) return;
+
+        Path home = Path.of(System.getProperty("user.home"));
+        Path instancesDir = home.resolve(".local/share/PrismLauncher/instances");
+
+        // Remove symlinks from selected instances and recreate as directories
+        for (String instanceName : instancesToRemove) {
+            Path savesPath = instancesDir.resolve(instanceName).resolve("minecraft/saves");
+            if (Files.isSymbolicLink(savesPath)) {
+                Files.delete(savesPath);
+                Files.createDirectories(savesPath);
+            }
+        }
+
+        // Sync state with filesystem - find all actually linked instances
+        List<String> actuallyLinked = new ArrayList<>();
+        if (Files.exists(instancesDir)) {
+            try (var stream = Files.list(instancesDir)) {
+                for (Path instanceDir : stream.filter(Files::isDirectory).toList()) {
+                    Path savesPath = instanceDir.resolve("minecraft/saves");
+                    if (Files.isSymbolicLink(savesPath)) {
+                        actuallyLinked.add(instanceDir.getFileName().toString());
+                    }
+                }
+            }
+        }
+
+        // Update state to reflect actual filesystem state
+        LingleState.linkedInstances = actuallyLinked;
+
+        // Re-number remaining instances
+        renumberInstances();
+
+        // Update state
+        LingleState.instanceCount = LingleState.linkedInstances.size();
+        LingleState.saveState();
+
+        // If no instances left, clear practice maps too
+        if (LingleState.instanceCount == 0) {
+            LingleState.selectedPracticeMaps.clear();
+            LingleState.practiceMaps = false;
+            LingleState.saveState();
+        }
+    }
+
+    private static void renumberInstances() throws IOException {
+        Path home = Path.of(System.getProperty("user.home"));
+        Path lingleDir = home.resolve("Lingle");
+
+        // First, remove all old symlinks and clean up directories
+        if (Files.exists(lingleDir)) {
+            try (var stream = Files.list(lingleDir)) {
+                for (Path dir : stream.filter(Files::isDirectory).toList()) {
+                    String name = dir.getFileName().toString();
+                    // Only process numbered directories
+                    if (name.matches("\\d+")) {
+                        // Delete the directory and all its contents
+                        try (var walk = Files.walk(dir)) {
+                            walk.sorted(Comparator.reverseOrder()).forEach(p -> {
+                                try { Files.deleteIfExists(p); } catch (IOException ignored) {}
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Now recreate symlinks with correct numbering
+        int idx = 1;
+        for (String instanceName : LingleState.linkedInstances) {
+            Path newLingleDir = lingleDir.resolve(String.valueOf(idx++));
+            Files.createDirectories(newLingleDir);
+
+            Path savesPath = home.resolve(".local/share/PrismLauncher/instances")
+                    .resolve(instanceName).resolve("minecraft/saves");
+
+            // Remove old symlink if it exists
+            if (Files.isSymbolicLink(savesPath)) {
+                Files.delete(savesPath);
+            } else if (Files.exists(savesPath)) {
+                // Clean up if it's a real directory
+                try (var stream = Files.walk(savesPath)) {
+                    stream.sorted(Comparator.reverseOrder()).forEach(p -> {
+                        try { Files.deleteIfExists(p); } catch (IOException ignored) {}
+                    });
+                }
+            }
+
+            // Create new symlink
+            try { Files.createSymbolicLink(savesPath, newLingleDir); }
+            catch (FileAlreadyExistsException ignored) {}
+        }
+
+        // Re-link practice maps if they exist
+        if (LingleState.practiceMaps && !LingleState.selectedPracticeMaps.isEmpty()) {
+            linkPracticeMapsNow();
+        }
+    }
+
+    public static void removePracticeMaps() throws IOException {
+        Path home = Path.of(System.getProperty("user.home"));
+
+        // Remove practice map symlinks from all instance directories
+        for (int k = 1; k <= LingleState.instanceCount; k++) {
+            Path instanceDir = home.resolve("Lingle").resolve(String.valueOf(k));
+            if (Files.exists(instanceDir)) {
+                for (String map : LingleState.selectedPracticeMaps) {
+                    Path link = instanceDir.resolve(map);
+                    if (Files.isSymbolicLink(link)) {
+                        Files.deleteIfExists(link);
+                    }
+                }
+            }
+        }
+
+        // Clear state
+        LingleState.selectedPracticeMaps.clear();
+        LingleState.practiceMaps = false;
+        LingleState.saveState();
     }
 }

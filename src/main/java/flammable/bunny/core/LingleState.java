@@ -19,6 +19,7 @@ public class LingleState {
     public static boolean enabled = false;
     public static boolean practiceMaps = false;
     public static int instanceCount = 0;
+    public static List<String> linkedInstances = new ArrayList<>();
     public static List<String> selectedPracticeMaps = new ArrayList<>();
     public static boolean adwEnabled = false;
     public static int adwIntervalSeconds = 300;
@@ -81,6 +82,13 @@ public class LingleState {
             practiceMaps = s.contains("\"practiceMaps\": true");
             Matcher m = Pattern.compile("\"instanceCount\"\\s*:\\s*(\\d+)").matcher(s);
             if (m.find()) instanceCount = Integer.parseInt(m.group(1));
+            linkedInstances.clear();
+            Matcher linkedArr = Pattern.compile("\"linkedInstances\"\\s*:\\s*\\[(.*?)]", Pattern.DOTALL).matcher(s);
+            if (linkedArr.find()) {
+                String inside = linkedArr.group(1);
+                Matcher item = Pattern.compile("\"(.*?)\"").matcher(inside);
+                while (item.find()) linkedInstances.add(item.group(1));
+            }
             selectedPracticeMaps.clear();
             Matcher arr = Pattern.compile("\"selectedMaps\"\\s*:\\s*\\[(.*?)]", Pattern.DOTALL).matcher(s);
             if (arr.find()) {
@@ -189,6 +197,9 @@ public class LingleState {
             if (distro != null) ordered.put("distro", distro);
             ordered.put("tmpfs", enabled ? "enabled" : "disabled");
             ordered.put("instanceCount", instanceCount);
+            org.json.JSONArray linkedArr = new org.json.JSONArray();
+            for (String inst : linkedInstances) linkedArr.put(inst);
+            ordered.put("linkedInstances", linkedArr);
             ordered.put("practiceMaps", practiceMaps);
             org.json.JSONArray arr = new org.json.JSONArray();
             for (String s : selectedPracticeMaps) arr.put(s);

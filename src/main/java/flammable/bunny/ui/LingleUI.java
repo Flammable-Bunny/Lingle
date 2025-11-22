@@ -85,7 +85,7 @@ public class LingleUI extends JFrame {
         navPanel.setBackground(BG);
         navPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(100, 100, 100)));
 
-        JButton tmpfsNavButton = new JButton("auToMPFS");
+        JButton tmpfsNavButton = new JButton("TMPFS");
         JButton installerNavButton = new JButton("Installer");
         JButton settingsNavButton = new JButton("Utilities");
         JButton supportNavButton = new JButton("Support");
@@ -232,10 +232,15 @@ public class LingleUI extends JFrame {
         mainListContainer.add(instancesScroll);
 
         JButton symlinkButton = makeButton("Symlink Instances", 180);
+        JButton removeInstancesButton = makeButton("Remove Instances", 180);
         JPanel symlinkRow = leftRow();
         symlinkRow.add(symlinkButton);
+        JPanel removeInstancesRow = leftRow();
+        removeInstancesRow.add(removeInstancesButton);
         mainListContainer.add(Box.createVerticalStrut(15));
         mainListContainer.add(symlinkRow);
+        mainListContainer.add(Box.createVerticalStrut(10));
+        mainListContainer.add(removeInstancesRow);
 
         // ===== Practice maps =====
         JLabel savesLabel = new JLabel("Practice Maps:");
@@ -301,15 +306,20 @@ public class LingleUI extends JFrame {
         mainListContainer.add(savesScroll);
 
         JButton linkPracticeBtn = makeButton("Link Practice Maps", 220);
+        JButton removePracticeBtn = makeButton("Remove Practice Maps", 220);
         JButton createDirsBtn = makeButton("Create Directories on Startup", 240);
 
         JPanel linkRow = leftRow();
         linkRow.add(linkPracticeBtn);
+        JPanel removePracticeRow = leftRow();
+        removePracticeRow.add(removePracticeBtn);
         JPanel dirsRow = leftRow();
         dirsRow.add(createDirsBtn);
 
         mainListContainer.add(Box.createVerticalStrut(15));
         mainListContainer.add(linkRow);
+        mainListContainer.add(Box.createVerticalStrut(10));
+        mainListContainer.add(removePracticeRow);
         mainListContainer.add(Box.createVerticalStrut(12));
         mainListContainer.add(dirsRow);
         mainListContainer.add(Box.createVerticalStrut(20));
@@ -354,6 +364,97 @@ public class LingleUI extends JFrame {
             }
         });
 
+        removeInstancesButton.addActionListener(e -> {
+            logAction("User clicked: Remove Instances");
+
+            // Check filesystem to find actually linked instances
+            Path instancesDir = home.resolve(".local/share/PrismLauncher/instances");
+            List<String> actuallyLinkedInstances = new ArrayList<>();
+
+            try {
+                if (Files.exists(instancesDir) && Files.isDirectory(instancesDir)) {
+                    for (Path instanceDir : Files.list(instancesDir)
+                            .filter(Files::isDirectory)
+                            .filter(p -> !p.getFileName().toString().equals(".tmp"))
+                            .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()))
+                            .toList()) {
+
+                        Path savesPath = instanceDir.resolve("minecraft/saves");
+                        if (Files.isSymbolicLink(savesPath)) {
+                            actuallyLinkedInstances.add(instanceDir.getFileName().toString());
+                        }
+                    }
+                }
+            } catch (IOException ex) {
+                logError("Failed to check linked instances", ex);
+                showDarkMessage(this, "Error", "Failed to check linked instances:\n" + ex.getMessage());
+                return;
+            }
+
+            // Check if there are any linked instances
+            if (actuallyLinkedInstances.isEmpty()) {
+                logError("Remove Instances: No instances are currently linked");
+                showDarkMessage(this, "No Linked Instances", "There are no instances currently linked via tmpfs.");
+                return;
+            }
+
+            // Build a list of currently linked instances to show in checkboxes
+            JPanel linkedPanel = new JPanel();
+            linkedPanel.setLayout(new BoxLayout(linkedPanel, BoxLayout.Y_AXIS));
+            linkedPanel.setBackground(BG);
+
+            List<JCheckBox> linkedCheckBoxes = new ArrayList<>();
+            for (String instanceName : actuallyLinkedInstances) {
+                JCheckBox cb = createStyledCheckBox(instanceName);
+                cb.setAlignmentX(Component.LEFT_ALIGNMENT);
+                linkedPanel.add(cb);
+                linkedCheckBoxes.add(cb);
+            }
+
+            // Show dialog with linked instances
+            JScrollPane scroll = makeScroll(linkedPanel);
+            scroll.setPreferredSize(new Dimension(300, Math.min(linkedCheckBoxes.size() * ROW_H, 200)));
+
+            int result = JOptionPane.showConfirmDialog(
+                this,
+                scroll,
+                "Select instances to remove",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE
+            );
+
+            if (result != JOptionPane.OK_OPTION) {
+                logInfo("Remove instances operation cancelled by user");
+                return;
+            }
+
+            // Collect selected instances
+            List<String> toRemove = new ArrayList<>();
+            for (JCheckBox cb : linkedCheckBoxes) {
+                if (cb.isSelected()) {
+                    toRemove.add(cb.getText());
+                }
+            }
+
+            if (toRemove.isEmpty()) {
+                logError("Remove Instances: No instances selected");
+                showDarkMessage(this, "No Instances Selected", "Please select at least one instance to remove.");
+                return;
+            }
+
+            logInfo("Selected instances to remove: " + String.join(", ", toRemove));
+
+            try {
+                logInfo("Removing " + toRemove.size() + " instance link(s)...");
+                LinkInstancesService.removeInstanceLinks(toRemove);
+                logSuccess("Instance links removed successfully");
+                showDarkMessage(this, "Done", toRemove.size() + " instance link(s) removed and re-numbered.");
+            } catch (IOException ex) {
+                logError("Failed to remove instance links", ex);
+                showDarkMessage(this, "Error", "Failed to remove instance links:\n" + ex.getMessage());
+            }
+        });
+
         linkPracticeBtn.addActionListener(e -> {
             logAction("User clicked: Link Practice Maps");
             if (LingleState.instanceCount == 0) {
@@ -384,6 +485,42 @@ public class LingleUI extends JFrame {
             } catch (IOException ex) {
                 logError("Failed to link practice maps", ex);
                 showDarkMessage(this, "Error", ex.getMessage());
+            }
+        });
+
+        removePracticeBtn.addActionListener(e -> {
+            logAction("User clicked: Remove Practice Maps");
+
+            // Check if there are any practice maps linked
+            if (LingleState.selectedPracticeMaps.isEmpty()) {
+                logError("Remove Practice Maps: No practice maps are currently linked");
+                showDarkMessage(this, "No Linked Maps", "There are no practice maps currently linked.");
+                return;
+            }
+
+            // Confirm removal
+            int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Remove all linked practice maps?\n\nCurrently linked maps:\n" +
+                String.join(", ", LingleState.selectedPracticeMaps),
+                "Confirm Removal",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+            );
+
+            if (confirm != JOptionPane.YES_OPTION) {
+                logInfo("Remove practice maps operation cancelled by user");
+                return;
+            }
+
+            try {
+                logInfo("Removing practice map links...");
+                LinkInstancesService.removePracticeMaps();
+                logSuccess("Practice maps removed successfully");
+                showDarkMessage(this, "Done", "Practice map links removed.");
+            } catch (IOException ex) {
+                logError("Failed to remove practice maps", ex);
+                showDarkMessage(this, "Error", "Failed to remove practice maps:\n" + ex.getMessage());
             }
         });
 
@@ -1211,12 +1348,12 @@ public class LingleUI extends JFrame {
 
         contentPanel.add(settingsPanel, "Utilities");
         contentPanel.add(installerPanel, "Installer");
-        contentPanel.add(tmpfsPanel, "auToMPFS");
+        contentPanel.add(tmpfsPanel, "TMPFS");
         contentPanel.add(supportPanel, "Support");
         contentPanel.add(logPanel, "Log");
         settingsNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Utilities"));
         installerNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Installer"));
-        tmpfsNavButton.addActionListener(e -> cardLayout.show(contentPanel, "auToMPFS"));
+        tmpfsNavButton.addActionListener(e -> cardLayout.show(contentPanel, "TMPFS"));
         supportNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Support"));
         logNavButton.addActionListener(e -> cardLayout.show(contentPanel, "Log"));
         cardLayout.show(contentPanel, "Utilities");
