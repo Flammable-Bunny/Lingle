@@ -555,6 +555,8 @@ public class PackageInstaller {
         LingleLogger.logInfo("Running pacur update.sh to pull container images...");
         Path updateScript = dockerDir.resolve("update.sh");
         LingleLogger.logCommand("bash " + updateScript);
+
+        // Run as regular user since we removed sudo from the scripts
         ProcessBuilder updateSh = new ProcessBuilder("bash", updateScript.toString());
         updateSh.directory(dockerDir.toFile());
         updateSh.redirectErrorStream(true);
@@ -582,6 +584,8 @@ public class PackageInstaller {
         LingleLogger.logInfo("Running pacur build.sh to build container images...");
         Path buildScript = dockerDir.resolve("build.sh");
         LingleLogger.logCommand("bash " + buildScript);
+
+        // Run as regular user since we removed sudo from the scripts
         ProcessBuilder buildSh = new ProcessBuilder("bash", buildScript.toString());
         buildSh.directory(dockerDir.toFile());
         buildSh.redirectErrorStream(true);
@@ -661,6 +665,7 @@ public class PackageInstaller {
         LingleLogger.logInfo("Running build-packages.sh with distro flag: " + (distroFlag != null ? distroFlag : "none"));
         LingleLogger.logCommand(buildCmd);
 
+        // Run as regular user since containers should be rootless
         ProcessBuilder buildPackages = distroFlag != null ?
                 new ProcessBuilder("bash", buildPackagesScript.toString(), distroFlag) :
                 new ProcessBuilder("bash", buildPackagesScript.toString());

@@ -101,7 +101,7 @@ public class LinkInstancesService {
                 Files.setPosixFilePermissions(script, perms);
             } catch (UnsupportedOperationException ignored) {}
 
-            // Create system service in /etc/systemd/system/ for reliability
+            // Create system service in /etc/systemd/system/
             String username = System.getProperty("user.name");
             String service = """
                     [Unit]
@@ -118,7 +118,7 @@ public class LinkInstancesService {
                     WantedBy=multi-user.target
                     """.formatted(username, script.toString());
 
-            // Write service file to /etc/systemd/system/ using elevated privileges
+            // Write service file to /etc/systemd/system/ using pkexe
             String serviceFilePath = "/etc/systemd/system/lingle-startup.service";
             String createServiceCmd = String.format(
                     "cat > %s << 'EOF'\n%sEOF\n",
@@ -136,7 +136,7 @@ public class LinkInstancesService {
             }
             LingleLogger.logSuccess("Service file created at " + serviceFilePath);
 
-            // Reload systemd daemon and enable service using elevated privileges
+            // Reload systemd daemon and enable service
             LingleLogger.logInfo("Reloading systemd daemon");
             int reloadExitCode = ElevatedInstaller.runElevatedBash("systemctl daemon-reload");
             if (reloadExitCode != 0) {
@@ -179,7 +179,7 @@ public class LinkInstancesService {
             }
         }
 
-        // Sync state with filesystem - find all actually linked instances
+        // Sync state with filesystem
         List<String> actuallyLinked = new ArrayList<>();
         if (Files.exists(instancesDir)) {
             try (var stream = Files.list(instancesDir)) {
