@@ -91,7 +91,7 @@ public class ChaoticAURInstaller {
             Path tempFile = Files.createTempFile("pacman", ".conf");
             Files.writeString(tempFile, newContent.toString());
 
-            int exitCode = ElevatedInstaller.runElevated("cp", tempFile.toString(), "/etc/pacman.conf");
+            int exitCode = ElevatedInstaller.runElevatedBash("cp '" + tempFile.toString() + "' '/etc/pacman.conf'");
 
             Files.deleteIfExists(tempFile);
 

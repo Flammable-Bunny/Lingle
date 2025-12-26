@@ -812,15 +812,56 @@ public class LingleUI extends JFrame {
 
         settingsPanel.add(Box.createVerticalStrut(10));
 
+        // Config editing toggle
+        JCheckBox configEditingToggle = createStyledCheckBox("Enable Waywall Config Editing");
+        configEditingToggle.setSelected(LingleState.configEditingEnabled);
+        configEditingToggle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        settingsPanel.add(configEditingToggle);
+
+        settingsPanel.add(Box.createVerticalStrut(10));
+
+        // Add Lingle to Config button
+        JButton addLingleBtn = makeButton(WaywallConfig.isLingleInConfig() ? "Lingle Already in Config" : "Add Lingle to Config", 200);
+        addLingleBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        addLingleBtn.setEnabled(LingleState.configEditingEnabled && !WaywallConfig.isLingleInConfig());
+        settingsPanel.add(addLingleBtn);
+
+        settingsPanel.add(Box.createVerticalStrut(10));
+
         JButton keybindsBtn = makeButton("Keybinds", 200);
         keybindsBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        keybindsBtn.setEnabled(LingleState.configEditingEnabled);
         settingsPanel.add(keybindsBtn);
 
         settingsPanel.add(Box.createVerticalStrut(10));
 
         JButton remapsBtn = makeButton("Remaps", 200);
         remapsBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        remapsBtn.setEnabled(LingleState.configEditingEnabled);
         settingsPanel.add(remapsBtn);
+
+        configEditingToggle.addActionListener(e -> {
+            LingleState.configEditingEnabled = configEditingToggle.isSelected();
+            LingleState.saveState();
+            keybindsBtn.setEnabled(LingleState.configEditingEnabled);
+            remapsBtn.setEnabled(LingleState.configEditingEnabled);
+            boolean lingleInConfig = WaywallConfig.isLingleInConfig();
+            addLingleBtn.setEnabled(LingleState.configEditingEnabled && !lingleInConfig);
+            addLingleBtn.setText(lingleInConfig ? "Lingle Already in Config" : "Add Lingle to Config");
+            logAction("Config editing " + (LingleState.configEditingEnabled ? "enabled" : "disabled"));
+        });
+
+        addLingleBtn.addActionListener(e -> {
+            logAction("User clicked: Add Lingle to Config");
+            try {
+                WaywallConfig.addLingleToConfig();
+                addLingleBtn.setText("Lingle Already in Config");
+                addLingleBtn.setEnabled(false);
+                showDarkMessage(this, "Success", "Lingle launcher code added to waywall init.lua");
+            } catch (Exception ex) {
+                showDarkMessage(this, "Error", "Failed to add Lingle to config: " + ex.getMessage());
+            }
+        });
 
         keybindsBtn.addActionListener(e -> {
             logAction("User clicked: Keybinds");
@@ -891,12 +932,12 @@ public class LingleUI extends JFrame {
 
             class BindDef { String title; String token; String var; boolean star; String cfgName; BindDef(String t, String token, String var, boolean star, String cfg){this.title=t; this.token=token; this.var=var; this.star=star; this.cfgName=cfg;} }
             BindDef[] defs = new BindDef[] {
-                new BindDef("Thin key", "thinplaceholder", "thin_key", true, "Thin_Key"),
-                new BindDef("Wide key", "wideplaceholder", "wide_key", true, "Wide_Key"),
-                new BindDef("Tall key", "tallplaceholder", "tall_key", true, "Tall_Key"),
-                new BindDef("Show Ninbot key", "shownbbplaceholder", "show_ninbot_key", true, "NBB_Key"),
+                new BindDef("Thin key", "thinplaceholder", "thin", true, "Thin_Key"),
+                new BindDef("Wide key", "wideplaceholder", "wide", true, "Wide_Key"),
+                new BindDef("Tall key", "tallplaceholder", "tall", true, "Tall_Key"),
+                new BindDef("Toggle Ninbot key", "shownbbplaceholder", "toggle_ninbot_key", true, "NBB_Key"),
                 new BindDef("Fullscreen key", "fullscreenplaceholder", "toggle_fullscreen_key", false, "Fullscreen_Key"),
-                new BindDef("Launch Apps key", "openappsplaceholder", "open_ninbot_key", false, "Apps_Key"),
+                new BindDef("Launch Paceman key", "openappsplaceholder", "launch_paceman_key", false, "Apps_Key"),
                 new BindDef("Toggle Remaps key", "toggleremapsplaceholder", "toggle_remaps_key", false, "Remaps_Key")
             };
 

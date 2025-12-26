@@ -47,7 +47,6 @@ public final class DistroDetector {
             case "fedora", "rhel", "centos", "rocky", "almalinux" -> "dnf";
             case "opensuse", "suse", "opensuse-tumbleweed", "opensuse-leap" -> "zypper";
             case "alpine" -> "apk";
-            case "nixos" -> "nix";
             case "void" -> "xbps";
             case "gentoo" -> "emerge";
             default -> null;

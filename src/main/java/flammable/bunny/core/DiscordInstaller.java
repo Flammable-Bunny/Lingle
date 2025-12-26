@@ -45,13 +45,13 @@ public class DiscordInstaller {
 
         Path target = Path.of(targetLocation);
         if (Files.exists(target)) {
-            int backupExitCode = ElevatedInstaller.runElevated("cp", targetLocation, targetLocation + ".backup");
+            int backupExitCode = ElevatedInstaller.runElevatedBash("cp '" + targetLocation + "' '" + targetLocation + ".backup'");
             if (backupExitCode != 0) {
                 throw new IOException("Failed to backup app.asar with exit code: " + backupExitCode);
             }
         }
 
-        int exitCode = ElevatedInstaller.runElevated("cp", tempAsar.toString(), targetLocation);
+        int exitCode = ElevatedInstaller.runElevatedBash("cp '" + tempAsar.toString() + "' '" + targetLocation + "'");
         if (exitCode != 0) {
             throw new IOException("Failed to replace app.asar with exit code: " + exitCode);
         }

@@ -27,6 +27,7 @@ public class LingleState {
     public static boolean worldBopperEnabled = false;
     public static List<KeepWorldInfo> boppableWorlds = new ArrayList<>();
     public static List<Remaps> remaps = new ArrayList<>();
+    public static boolean configEditingEnabled = false;
 
     private static final String[] KEYBIND_NAMES = new String[] {
         "Thin_Key", "Wide_Key", "Tall_Key", "NBB_Key", "Fullscreen_Key", "Apps_Key", "Remaps_Key"
@@ -107,6 +108,7 @@ public class LingleState {
                 while (item.find()) WorldbopperSelectedInstances.add(item.group(1));
             }
             worldBopperEnabled = s.contains("\"worldBopperEnabled\": true");
+            configEditingEnabled = s.contains("\"configEditingEnabled\": true");
 
             // Load boppable worlds
             boppableWorlds.clear();
@@ -210,6 +212,7 @@ public class LingleState {
             for (String inst : WorldbopperSelectedInstances) wbInstArr.put(inst);
             ordered.put("WorldBopperInstances", wbInstArr);
             ordered.put("worldBopperEnabled", worldBopperEnabled);
+            ordered.put("configEditingEnabled", configEditingEnabled);
 
             // Save boppable worlds
             ensureDefaultBoppableWorlds();

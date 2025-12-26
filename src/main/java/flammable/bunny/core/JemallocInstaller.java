@@ -12,14 +12,13 @@ public final class JemallocInstaller {
         if (pkgManager == null) throw new IOException("Could not detect package manager");
 
         String cmd = switch (pkgManager) {
-            case "pacman" -> "sudo pacman -S --noconfirm jemalloc";
-            case "apt" -> "sudo apt update && sudo apt install -y libjemalloc2";
-            case "dnf" -> "sudo dnf install -y jemalloc";
-            case "zypper" -> "sudo zypper install -y jemalloc2";
-            case "apk" -> "sudo apk add jemalloc";
-            case "nix" -> "nix-env -iA nixpkgs.jemalloc";
-            case "xbps" -> "sudo xbps-install -Sy jemalloc";
-            case "emerge" -> "sudo emerge -av jemalloc";
+            case "pacman" -> "pacman -S --noconfirm jemalloc";
+            case "apt" -> "apt update && apt install -y libjemalloc2";
+            case "dnf" -> "dnf install -y jemalloc";
+            case "zypper" -> "zypper install -y jemalloc";
+            case "apk" -> "apk add jemalloc";
+            case "xbps" -> "xbps-install -Sy jemalloc";
+            case "emerge" -> "emerge jemalloc";
             default -> throw new IOException("Unsupported package manager: " + pkgManager);
         };
 

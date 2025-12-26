@@ -112,9 +112,27 @@ public class WaywallConfig {
             }
         }
 
-        // Ensure lingle launcher code exists in init.lua
-        updated = ensureLingleLauncherCode(updated);
+        Files.writeString(INIT_FILE, updated, StandardCharsets.UTF_8);
+    }
 
+    public static boolean isLingleInConfig() {
+        try {
+            if (!Files.exists(INIT_FILE)) return false;
+            String content = Files.readString(INIT_FILE);
+            return content.contains("--*********************************************************************************************** LINGLE");
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    public static void addLingleToConfig() throws IOException {
+        Files.createDirectories(CONFIG_DIR);
+        if (!Files.exists(INIT_FILE)) {
+            throw new IOException("Waywall init.lua not found. Please install waywall generic config first.");
+        }
+
+        String content = Files.readString(INIT_FILE);
+        String updated = ensureLingleLauncherCode(content);
         Files.writeString(INIT_FILE, updated, StandardCharsets.UTF_8);
     }
 
@@ -301,28 +319,28 @@ public class WaywallConfig {
 
         StringBuilder sb = new StringBuilder();
         sb.append("return {\n");
-        sb.append("remapped_kb = {\n");
+        sb.append("    remapped_kb = {\n");
+        sb.append("        -- Add any playing remaps here (active during gameplay, toggled with remaps key)\n");
 
-        // Permanent remaps (always active)
-        for (Remaps remap : remaps) {
-            if (remap.isPermanent && !remap.fromKey.isEmpty() && !remap.toKey.isEmpty()) {
-                sb.append("\t[\"").append(remap.fromKey).append("\"] = \"").append(remap.toKey).append("\",\n");
-            }
-        }
-
-        sb.append("\t-- remaps_placeholder\n");
-        sb.append("},\n\n");
-        sb.append("normal_kb = {\n");
-
-        // Normal remaps (toggleable)
+        // Toggleable remaps go to remapped_kb (active during gameplay, can be toggled off)
         for (Remaps remap : remaps) {
             if (!remap.isPermanent && !remap.fromKey.isEmpty() && !remap.toKey.isEmpty()) {
-                sb.append("\t[\"").append(remap.fromKey).append("\"] = \"").append(remap.toKey).append("\",\n");
+                sb.append("        [\"").append(remap.fromKey).append("\"] = \"").append(remap.toKey).append("\",\n");
             }
         }
 
-        sb.append("\t--disabled_placeholder\n");
-        sb.append("\n},\n\n");
+        sb.append("\n    },\n\n");
+        sb.append("    normal_kb = {\n");
+        sb.append("        -- Add any remaps you want to keep when disabling normal remaps (always active)\n");
+
+        // Permanent/always-active remaps go to normal_kb (stay active even when remaps are toggled off)
+        for (Remaps remap : remaps) {
+            if (remap.isPermanent && !remap.fromKey.isEmpty() && !remap.toKey.isEmpty()) {
+                sb.append("        [\"").append(remap.fromKey).append("\"] = \"").append(remap.toKey).append("\",\n");
+            }
+        }
+
+        sb.append("\n    },\n\n");
         sb.append("}\n");
 
         Files.writeString(REMAPS, sb.toString(), StandardCharsets.UTF_8);
@@ -335,7 +353,7 @@ public class WaywallConfig {
 
             String content = Files.readString(REMAPS);
 
-            // Parse remapped_kb (permanent)
+            // Parse remapped_kb (toggleable - active during gameplay)
             Pattern remappedKbSection = Pattern.compile("remapped_kb\\s*=\\s*\\{([^}]+)\\}", Pattern.DOTALL);
             Matcher m1 = remappedKbSection.matcher(content);
             if (m1.find()) {
@@ -345,11 +363,11 @@ public class WaywallConfig {
                 while (entries.find()) {
                     String from = entries.group(1);
                     String to = entries.group(2);
-                    remaps.add(new Remaps(from, to, true));
+                    remaps.add(new Remaps(from, to, false)); // toggleable = isPermanent false
                 }
             }
 
-            // Parse normal_kb (toggleable)
+            // Parse normal_kb (always active - permanent)
             Pattern normalKbSection = Pattern.compile("normal_kb\\s*=\\s*\\{([^}]+)\\}", Pattern.DOTALL);
             Matcher m2 = normalKbSection.matcher(content);
             if (m2.find()) {
@@ -359,7 +377,7 @@ public class WaywallConfig {
                 while (entries.find()) {
                     String from = entries.group(1);
                     String to = entries.group(2);
-                    remaps.add(new Remaps(from, to, false));
+                    remaps.add(new Remaps(from, to, true)); // always active = isPermanent true
                 }
             }
 

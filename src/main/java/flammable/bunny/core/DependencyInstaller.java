@@ -63,7 +63,6 @@ public class DependencyInstaller {
             case "dnf" -> "dnf install -y " + joined;
             case "zypper" -> "zypper install -y " + joined;
             case "apk" -> "apk add " + joined;
-            case "nix" -> "nix-env -iA nixpkgs." + joined.replace(" ", " nixpkgs.");
             case "xbps" -> "xbps-install -Sy " + joined;
             case "emerge" -> "emerge " + joined;
             default -> throw new IOException("Unsupported package manager: " + mgr);
